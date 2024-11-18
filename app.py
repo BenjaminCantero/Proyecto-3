@@ -223,6 +223,13 @@ class RestauranteApp(ctk.CTk):
             return False
         return True
     
+    def validacion_email(self, nombre, email):
+        # Expresión regular para validar el formato de un correo electrónico
+        if re.match(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", email) is None:
+            messagebox.showerror(title="Error", message=f"El campo {nombre} debe contener un correo válido")
+            return False
+        return True
+    
     def añadir_ingrediente(self):
         nombre_entry = self.nombre_entry.get()
         tipo = self.tipo_entry.get()
@@ -282,14 +289,14 @@ class RestauranteApp(ctk.CTk):
         # Nombre del menú
         nombre_label = ctk.CTkLabel(info_frame, text="Nombre del Menú:")
         nombre_label.pack(anchor="w", padx=5)
-        nombre_entry = ctk.CTkEntry(info_frame, placeholder_text="Ej: Completo Italiano", width=300)
-        nombre_entry.pack(anchor="w", padx=5, pady=(0,10))
+        self.nombre_entrym = ctk.CTkEntry(info_frame, placeholder_text="Ej: Completo Italiano", width=300)
+        self.nombre_entrym.pack(anchor="w", padx=5, pady=(0,10))
         
         # Descripción
         desc_label = ctk.CTkLabel(info_frame, text="Descripción:")
         desc_label.pack(anchor="w", padx=5)
-        desc_text = ctk.CTkTextbox(info_frame, height=60, width=400)
-        desc_text.pack(anchor="w", padx=5, pady=(0,10))
+        self.desc_text = ctk.CTkTextbox(info_frame, height=60, width=400)
+        self.desc_text.pack(anchor="w", padx=5, pady=(0,10))
         
         # Selección de ingredientes
         ingredientes_frame = ctk.CTkFrame(menu_frame)
@@ -373,6 +380,7 @@ class RestauranteApp(ctk.CTk):
             width=120,
             height=35
         )
+        new_client_btn.configure(command=self.añadir_cliente)
         new_client_btn.pack(side="right")
         
         # Formulario de cliente
@@ -386,14 +394,14 @@ class RestauranteApp(ctk.CTk):
         # Nombre
         nombre_label = ctk.CTkLabel(fields_frame, text="Nombre completo:")
         nombre_label.pack(anchor="w", padx=5)
-        nombre_entry = ctk.CTkEntry(fields_frame, placeholder_text="Nombre del cliente", width=300)
-        nombre_entry.pack(anchor="w", padx=5, pady=(0,15))
+        self.nombre_entryc = ctk.CTkEntry(fields_frame, placeholder_text="Nombre del cliente", width=300)
+        self.nombre_entryc.pack(anchor="w", padx=5, pady=(0,15))
         
         # Email
         email_label = ctk.CTkLabel(fields_frame, text="Correo electrónico:")
         email_label.pack(anchor="w", padx=5)
-        email_entry = ctk.CTkEntry(fields_frame, placeholder_text="email@ejemplo.com", width=300)
-        email_entry.pack(anchor="w", padx=5, pady=(0,15))
+        self.email_entry = ctk.CTkEntry(fields_frame, placeholder_text="email@ejemplo.com", width=300)
+        self.email_entry.pack(anchor="w", padx=5, pady=(0,15))
         
         # Botones
         button_frame = ctk.CTkFrame(form_frame, fg_color="transparent")
@@ -414,19 +422,53 @@ class RestauranteApp(ctk.CTk):
         
         # Tabla de clientes
         columns = ("Nombre", "Email", "Fecha Registro")
-        tree = ttk.Treeview(list_frame, columns=columns, show="headings", height=10)
+        self.tree3 = ttk.Treeview(list_frame, columns=columns, show="headings", height=10)
         
         for col in columns:
-            tree.heading(col, text=col)
-            tree.column(col, width=150)
+            self.tree3.heading(col, text=col)
+            self.tree3.column(col, width=150)
         
-        tree.pack(fill="both", expand=True, padx=5, pady=5)
+        self.tree3.pack(fill="both", expand=True, padx=5, pady=5)
         
         # Scrollbar
-        scrollbar = ctk.CTkScrollbar(list_frame, command=tree.yview)
+        scrollbar = ctk.CTkScrollbar(list_frame, command=self.tree3.yview)
         scrollbar.pack(side="right", fill="y")
-        tree.configure(yscrollcommand=scrollbar.set)
+        self.tree3.configure(yscrollcommand=scrollbar.set)
+        self.Actualizar_Treeview_clientes()
+    
+    def añadir_cliente(self):
+        nombre_c = self.nombre_entryc.get()
+        email = self.email_entry.get()
+        
+        campos = {'Nombre':nombre_c,'Correo electronico':email}
+        for nombre,valor in campos.items():
+            result = self.validacion_vacio(nombre,valor)
+            if not result:
+                return False
+        validar_email=self.validacion_email('Correo electronico',email)
+        if not validar_email:
+            return False
+        resultado = cliente_crud.crear_cliente(nombre_c, email)
+        if resultado[0]:
+            messagebox.showinfo(title="Éxito", message="Cliente añadido exitosamente")
+            # Limpiar los Entry después de agregar el ingrediente
+            self.nombre_entryc.delete(0, END)
+            self.email_entry.delete(0, END)
+            self.Actualizar_Treeview_clientes()
+        else:
+            if resultado[1]==0: mensaje= f'de nombre {nombre_c}'
+            elif resultado[1] == 1: mensaje = f'de correo {email}'
+            messagebox.showerror(title="Error", message=f"El cliente {mensaje} ya existe")
+        
+    def Actualizar_Treeview_clientes(self):
+        # Limpiar la lista
+        for item in self.tree3.get_children():
+            self.tree3.delete(item)
 
+        # Agregar los ingredientes 
+        for cliente in cliente_crud.leer_clientes():
+            self.tree3.insert("", "end", values=(cliente.nombre,cliente.email,cliente.fecha_registro))
+ 
     def mostrar_panel_compra(self):
         self.limpiar_panel()
         

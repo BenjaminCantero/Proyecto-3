@@ -3,7 +3,8 @@
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey, Table
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
-import datetime
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 Base = declarative_base()
 
@@ -19,7 +20,8 @@ class Cliente(Base):
     id = Column(Integer, primary_key=True)
     nombre = Column(String, unique=True)
     email = Column(String, unique=True)
-    fecha_registro = Column(DateTime, default=datetime.datetime.utcnow)
+    # Definición de la columna con precisión hasta segundos
+    fecha_registro = Column(DateTime, default=lambda: datetime.now(ZoneInfo("America/Santiago")).replace(microsecond=0))
     
     pedidos = relationship("Pedido", back_populates="cliente")
 
@@ -48,7 +50,7 @@ class Pedido(Base):
     
     id = Column(Integer, primary_key=True)
     cliente_id = Column(Integer, ForeignKey('cliente.id'))
-    fecha_pedido = Column(DateTime, default=datetime.datetime.utcnow)
+    fecha_pedido = Column(DateTime, default=lambda: datetime.now(ZoneInfo("America/Santiago")).replace(microsecond=0))
     total = Column(Float)
     estado = Column(String)
     

@@ -4,15 +4,24 @@ class ClienteCRUD:
     def __init__(self, session):
         self.session = session
 
-    def crear_cliente(self, nombre:str, email:str):
-        # Comprobar si el ingrediente ya existe
-        existente1 = self.session.query(Cliente).filter_by(nombre=nombre).first()
-        existente2 = self.session.query(Cliente).filter_by(email=email).first()
-        if existente1 or existente2:
-            return False  # Retorna False si el ingrediente ya existe
+    def crear_cliente(self, nombre: str, email: str):
+        # Comprobar si ya existe un cliente con el mismo nombre o email
+        existente = self.session.query(Cliente).filter(
+            (Cliente.nombre == nombre) | (Cliente.email == email)
+        ).first()
+    
+        if existente:
+            # Retorna un mensaje indicando qué atributo ya está en uso
+            if existente.nombre == nombre:
+                return [False,0]
+            if existente.email == email:
+                return [False,1]
+
+        # Crear y guardar el nuevo cliente si no existe
         nuevo_cliente = Cliente(nombre=nombre, email=email)
         self.session.add(nuevo_cliente)
         self.session.commit()
+        return [True]
 
     def leer_clientes(self):
         return self.session.query(Cliente).all()
