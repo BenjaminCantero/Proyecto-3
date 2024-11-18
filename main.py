@@ -1,5 +1,8 @@
 from database import Session
-from Crud import ClienteCRUD, IngredienteCRUD, MenuCRUD, PedidoCRUD
+from Crud.cliente_crud import ClienteCRUD
+from Crud.ingrediente_crud import IngredienteCRUD 
+from Crud.menu_crud import MenuCRUD 
+from Crud.pedidos_crud import PedidosCRUD
 
 # Crear una sesión
 session = Session()
@@ -8,7 +11,7 @@ session = Session()
 cliente_crud = ClienteCRUD(session)
 ingrediente_crud = IngredienteCRUD(session)
 menu_crud = MenuCRUD(session)
-pedido_crud = PedidoCRUD(session)
+pedido_crud = PedidosCRUD(session)
 
 # Ejemplo de uso
 # Crear un nuevo cliente

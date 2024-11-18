@@ -1,7 +1,23 @@
 import customtkinter as ctk
 import tkinter as tk
+from tkinter import END
 from tkinter import ttk
 from tkinter import messagebox
+import re
+from database import Session
+from Crud.cliente_crud import ClienteCRUD
+from Crud.ingrediente_crud import IngredienteCRUD 
+from Crud.menu_crud import MenuCRUD 
+from Crud.pedidos_crud import PedidosCRUD
+
+# Crear una sesión
+session = Session()
+
+# Instanciar las clases CRUD
+cliente_crud = ClienteCRUD(session)
+ingrediente_crud = IngredienteCRUD(session)
+menu_crud = MenuCRUD(session)
+pedido_crud = PedidosCRUD(session)
 
 class RestauranteApp(ctk.CTk):
     def __init__(self):
@@ -109,7 +125,7 @@ class RestauranteApp(ctk.CTk):
                 height=35
             )
             entry.pack(fill="x", expand=True, padx=5)
-            setattr(self, entry_name, entry)
+            setattr(self, entry_name, entry) # asigna cada entrada (entry) como un atributo de la clase utilizando el nombre definido en entry_name
         
         # Botones de acción
         button_frame = ctk.CTkFrame(form_frame, fg_color="transparent")
@@ -122,6 +138,7 @@ class RestauranteApp(ctk.CTk):
             height=40,
             corner_radius=8
         )
+        add_button.configure(command=self.añadir_ingrediente)
         add_button.pack(side="left", padx=10)
         
         clear_button = ctk.CTkButton(
@@ -177,6 +194,59 @@ class RestauranteApp(ctk.CTk):
         
         self.tree.configure(yscrollcommand=scrollbar.set)
         self.tree.pack(fill="both", expand=True, padx=5, pady=5)
+        self.Actualizar_Treeview_ingredientes()
+        
+    def Actualizar_Treeview_ingredientes(self):
+        # Limpiar la lista
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+
+        # Agregar los ingredientes 
+        for ingrediente in ingrediente_crud.leer_ingredientes():
+            self.tree.insert("", "end", values=(ingrediente.nombre,ingrediente.tipo, ingrediente.cantidad, ingrediente.unidad))
+    
+    def validacion_numero(self, nombre, numero):
+        if numero == "":
+            messagebox.showerror(title="Error", message=f"El campo {nombre} no puede estar vacío")
+            return False
+        
+        elif re.match(r"^[0-9]*\.?[0-9]+$", numero) is None:  # Expresión regular para aceptar números enteros y flotantes positivos, no permite el signo negativo
+            messagebox.showerror(title="Error", message=f"El campo {nombre} solo acepta números positivos")
+            return False
+
+        # Si pasa todas las validaciones
+        return True
+
+    def validacion_vacio(self,nombre,valor):
+        if valor == "":
+            messagebox.showerror(title ="Error", message=f"El campo {nombre} no puede estar vacio")
+            return False
+        return True
+    
+    def añadir_ingrediente(self):
+        nombre_entry = self.nombre_entry.get()
+        tipo = self.tipo_entry.get()
+        cantidad = self.cantidad_entry.get()
+        unidad = self.unidad_entry.get()
+        
+        campos = {'Nombre':nombre_entry,'Tipo':tipo,'Cantidad':cantidad,'Unidad':unidad}
+        for nombre,valor in campos.items():
+            result = self.validacion_vacio(nombre,valor)
+            if not result:
+                return False
+        if not self.validacion_numero('Cantidad',cantidad):
+            return False
+        resultado = ingrediente_crud.crear_ingrediente(nombre_entry, tipo, float(cantidad), unidad)
+        if resultado:
+            messagebox.showinfo(title="Éxito", message="Ingrediente añadido exitosamente")
+            # Limpiar los Entry después de agregar el ingrediente
+            self.nombre_entry.delete(0, END)
+            self.tipo_entry.delete(0, END)
+            self.cantidad_entry.delete(0, END)
+            self.unidad_entry.delete(0, END)
+        else:
+            messagebox.showinfo(title="Éxito", message=f"Ingrediente existente, se suma.")
+        self.Actualizar_Treeview_ingredientes()
 
     def mostrar_panel_menus(self):
         self.limpiar_panel()

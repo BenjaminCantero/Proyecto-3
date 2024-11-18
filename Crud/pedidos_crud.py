@@ -5,7 +5,7 @@ class PedidosCRUD:
     def __init__(self, session):
         self.session = session
 
-    def crear_pedido(self, cliente_id, total, estado):
+    def crear_pedido(self, cliente_id:int, total:float, estado:str):
         nuevo_pedido = Pedido(cliente_id=cliente_id, total=total, estado=estado)
         self.session.add(nuevo_pedido)
         self.session.commit()
@@ -13,7 +13,7 @@ class PedidosCRUD:
     def leer_pedidos(self):
         return self.session.query(Pedido).all()
 
-    def actualizar_pedido(self, pedido_id, cliente_id=None, total=None, estado=None):
+    def actualizar_pedido(self, pedido_id:int, cliente_id:int=None, total:float=None, estado:str=None):
         pedido = self.session.query(Pedido).filter(Pedido.id == pedido_id).first()
         if pedido:
             if cliente_id:
@@ -24,7 +24,7 @@ class PedidosCRUD:
                 pedido.estado = estado
             self.session.commit()
 
-    def eliminar_pedido(self, pedido_id):
+    def eliminar_pedido(self, pedido_id:int):
         pedido = self.session.query(Pedido).filter(Pedido.id == pedido_id).first()
         if pedido:
             self.session.delete(pedido)

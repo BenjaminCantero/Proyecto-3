@@ -17,8 +17,8 @@ class Cliente(Base):
     __tablename__ = 'cliente'
     
     id = Column(Integer, primary_key=True)
-    nombre = Column(String)
-    email = Column(String)
+    nombre = Column(String, unique=True)
+    email = Column(String, unique=True)
     fecha_registro = Column(DateTime, default=datetime.datetime.utcnow)
     
     pedidos = relationship("Pedido", back_populates="cliente")
@@ -27,7 +27,7 @@ class Ingrediente(Base):
     __tablename__ = 'ingrediente'
     
     id = Column(Integer, primary_key=True)
-    nombre = Column(String)
+    nombre = Column(String, unique=True)
     tipo = Column(String)
     cantidad = Column(Float)
     unidad = Column(String)

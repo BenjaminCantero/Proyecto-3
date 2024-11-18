@@ -5,15 +5,23 @@ class IngredienteCRUD:
     def __init__(self, session):
         self.session = session
 
-    def crear_ingrediente(self, nombre, tipo, cantidad, unidad):
+    def crear_ingrediente(self, nombre: str, tipo: str, cantidad: int, unidad: str):
+        # Comprobar si el ingrediente ya existe
+        existente = self.session.query(Ingrediente).filter_by(nombre=nombre).first()
+        if existente:
+            existente.cantidad+=cantidad
+            return False  # Retorna False si el ingrediente ya existe
+    
+        # Crear e insertar el nuevo ingrediente
         nuevo_ingrediente = Ingrediente(nombre=nombre, tipo=tipo, cantidad=cantidad, unidad=unidad)
         self.session.add(nuevo_ingrediente)
         self.session.commit()
+        return True  # Retorna True si se añadió correctamente
 
     def leer_ingredientes(self):
         return self.session.query(Ingrediente).all()
 
-    def actualizar_ingrediente(self, ingrediente_id, nombre=None, tipo=None, cantidad=None, unidad=None):
+    def actualizar_ingrediente(self, ingrediente_id:int, nombre:str=None, tipo:str=None, cantidad:int=None, unidad:str=None):
         ingrediente = self.session.query(Ingrediente).filter(Ingrediente.id == ingrediente_id).first()
         if ingrediente:
             if nombre:
@@ -26,7 +34,7 @@ class IngredienteCRUD:
                 ingrediente.unidad = unidad
             self.session.commit()
 
-    def eliminar_ingrediente(self, ingrediente_id):
+    def eliminar_ingrediente(self, ingrediente_id:int):
         ingrediente = self.session.query(Ingrediente).filter(Ingrediente.id == ingrediente_id).first()
         if ingrediente:
             self.session.delete(ingrediente)
