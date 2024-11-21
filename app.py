@@ -85,52 +85,69 @@ class RestauranteApp(ctk.CTk):
         
     def mostrar_panel_ingredientes(self):
         self.limpiar_panel()
-        
+
         # Título del panel
         header_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
-        header_frame.grid(row=0, column=0, padx=20, pady=(20,10), sticky="ew")
-        
+        header_frame.grid(row=0, column=0, padx=20, pady=(20, 10), sticky="ew")
+
         title = ctk.CTkLabel(
-            header_frame, 
+            header_frame,
             text="Gestión de Ingredientes",
             font=ctk.CTkFont(size=24, weight="bold")
         )
         title.pack(side="left")
-        
+
         # Formulario de entrada
         form_frame = ctk.CTkFrame(self.main_frame)
-        form_frame.grid(row=1, column=0, padx=20, pady=(0,20), sticky="ew")
-        
+        form_frame.grid(row=1, column=0, padx=20, pady=(0, 20), sticky="ew")
+
         # Grid para los campos de entrada
-        form_frame.grid_columnconfigure((0,1,2,3), weight=1)
-        
+        form_frame.grid_columnconfigure((0, 1, 2, 3, 4), weight=1)
+
         # Campos con labels flotantes
         campos = [
             ("Nombre:", "nombre_entry"),
             ("Tipo:", "tipo_entry"),
             ("Cantidad:", "cantidad_entry"),
+            ("Categoría:", "categoria_entry"),
             ("Unidad:", "unidad_entry")
         ]
-        
+
         for idx, (label_text, entry_name) in enumerate(campos):
             container = ctk.CTkFrame(form_frame, fg_color="transparent")
             container.grid(row=0, column=idx, padx=10, pady=10, sticky="ew")
-            
+
             label = ctk.CTkLabel(container, text=label_text)
             label.pack(anchor="w", padx=5)
-            
-            entry = ctk.CTkEntry(
-                container,
-                placeholder_text=label_text.replace(":", ""),
-                height=35
-            )
+
+            if label_text == "Unidad:":
+                # Menú desplegable para Unidad
+                entry = ctk.CTkOptionMenu(
+                    container,
+                    values=["Litro", "Kilo", "Gramo", "Unidad"],
+                    height=35
+                )
+            elif label_text == "Categoría:":
+                # Menú desplegable para Categoría
+                entry = ctk.CTkOptionMenu(
+                    container,
+                    values=["Frutas", "Verduras", "Lácteos", "Granos", "Otros"],
+                    height=35
+                )
+            else:
+                # Entrada estándar
+                entry = ctk.CTkEntry(
+                    container,
+                    placeholder_text=label_text.replace(":", ""),
+                    height=35
+                )
             entry.pack(fill="x", expand=True, padx=5)
-            setattr(self, entry_name, entry) # asigna cada entrada (entry) como un atributo de la clase utilizando el nombre definido en entry_name
-        
+            setattr(self, entry_name, entry)
+
         # Botones de acción
         button_frame = ctk.CTkFrame(form_frame, fg_color="transparent")
-        button_frame.grid(row=1, column=0, columnspan=4, pady=(10,20), sticky="ew")
-        
+        button_frame.grid(row=1, column=0, columnspan=5, pady=(10, 20), sticky="ew")
+
         add_button = ctk.CTkButton(
             button_frame,
             text="Añadir Ingrediente",
@@ -140,7 +157,7 @@ class RestauranteApp(ctk.CTk):
         )
         add_button.configure(command=self.añadir_ingrediente)
         add_button.pack(side="left", padx=10)
-        
+
         clear_button = ctk.CTkButton(
             button_frame,
             text="Limpiar",
@@ -151,13 +168,14 @@ class RestauranteApp(ctk.CTk):
             border_width=1,
             hover_color=("gray70", "gray30")
         )
+        clear_button.configure(command=self.limpiar_campos)  # Limpia los campos
         clear_button.pack(side="left", padx=10)
-        
+
         # Tabla mejorada
         table_frame = ctk.CTkFrame(self.main_frame)
-        table_frame.grid(row=2, column=0, padx=20, pady=(0,20), sticky="nsew")
+        table_frame.grid(row=2, column=0, padx=20, pady=(0, 20), sticky="nsew")
         self.main_frame.grid_rowconfigure(2, weight=1)
-        
+
         # Estilo personalizado para la tabla
         style = ttk.Style()
         style.configure(
@@ -173,8 +191,8 @@ class RestauranteApp(ctk.CTk):
             foreground="black",
             relief="flat"
         )
-        
-        columns = ("Nombre", "Tipo", "Cantidad", "Unidad")
+
+        columns = ("Nombre", "Tipo", "Cantidad", "Categoría", "Unidad")
         self.tree = ttk.Treeview(
             table_frame,
             columns=columns,
@@ -182,20 +200,59 @@ class RestauranteApp(ctk.CTk):
             style="Custom.Treeview",
             height=10
         )
-        
+
         # Configurar columnas
         for col in columns:
             self.tree.heading(col, text=col, anchor="w")
             self.tree.column(col, width=150, anchor="w")
-        
+
         # Scrollbar
         scrollbar = ctk.CTkScrollbar(table_frame, command=self.tree.yview)
         scrollbar.pack(side="right", fill="y")
-        
+
         self.tree.configure(yscrollcommand=scrollbar.set)
         self.tree.pack(fill="both", expand=True, padx=5, pady=5)
+
+        # Vincular evento de selección
+        self.tree.bind("<<TreeviewSelect>>", self.seleccionar_ingrediente)
+
         self.Actualizar_Treeview_ingredientes()
-        
+
+    def seleccionar_ingrediente(self, event):
+        """
+        Evento para mostrar los datos del ingrediente seleccionado en los campos de entrada.
+        """
+        selected_item = self.tree.selection()
+        if not selected_item:
+            return
+
+        # Obtener los valores de la fila seleccionada
+        item_data = self.tree.item(selected_item[0], "values")
+
+        # Asignar valores a los campos
+        self.nombre_entry.delete(0, "end")
+        self.nombre_entry.insert(0, item_data[0])
+
+        self.tipo_entry.delete(0, "end")
+        self.tipo_entry.insert(0, item_data[1])
+
+        self.cantidad_entry.delete(0, "end")
+        self.cantidad_entry.insert(0, item_data[2])
+
+        self.categoria_entry.set(item_data[3])  # Para el OptionMenu
+        self.unidad_entry.set(item_data[4])    # Para el OptionMenu
+
+    def limpiar_campos(self):
+        """
+        Limpia todos los campos de entrada.
+        """
+        self.nombre_entry.delete(0, "end")
+        self.tipo_entry.delete(0, "end")
+        self.cantidad_entry.delete(0, "end")
+        self.categoria_entry.set("")
+        self.unidad_entry.set("")
+
+
     def Actualizar_Treeview_ingredientes(self):
         # Limpiar la lista
         for item in self.tree.get_children():
@@ -255,15 +312,23 @@ class RestauranteApp(ctk.CTk):
             messagebox.showinfo(title="Éxito", message=f"Ingrediente existente, se suma.")
         self.Actualizar_Treeview_ingredientes()
 
+
+
+
+
+
+
+
+
     def mostrar_panel_menus(self):
         self.limpiar_panel()
         
         # Header
         header_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
-        header_frame.grid(row=0, column=0, padx=20, pady=(20,10), sticky="ew")
+        header_frame.grid(row=0, column=0, padx=20, pady=(20, 10), sticky="ew")
         
         title = ctk.CTkLabel(
-            header_frame, 
+            header_frame,
             text="Gestión de Menús",
             font=ctk.CTkFont(size=24, weight="bold")
         )
@@ -280,7 +345,7 @@ class RestauranteApp(ctk.CTk):
         
         # Panel de creación de menú
         menu_frame = ctk.CTkFrame(self.main_frame)
-        menu_frame.grid(row=1, column=0, padx=20, pady=(0,20), sticky="ew")
+        menu_frame.grid(row=1, column=0, padx=20, pady=(0, 20), sticky="ew")
         
         # Información básica del menú
         info_frame = ctk.CTkFrame(menu_frame, fg_color="transparent")
@@ -290,13 +355,13 @@ class RestauranteApp(ctk.CTk):
         nombre_label = ctk.CTkLabel(info_frame, text="Nombre del Menú:")
         nombre_label.pack(anchor="w", padx=5)
         self.nombre_entrym = ctk.CTkEntry(info_frame, placeholder_text="Ej: Completo Italiano", width=300)
-        self.nombre_entrym.pack(anchor="w", padx=5, pady=(0,10))
+        self.nombre_entrym.pack(anchor="w", padx=5, pady=(0, 10))
         
         # Descripción
         desc_label = ctk.CTkLabel(info_frame, text="Descripción:")
         desc_label.pack(anchor="w", padx=5)
         self.desc_text = ctk.CTkTextbox(info_frame, height=60, width=400)
-        self.desc_text.pack(anchor="w", padx=5, pady=(0,10))
+        self.desc_text.pack(anchor="w", padx=5, pady=(0, 10))
         
         # Selección de ingredientes
         ingredientes_frame = ctk.CTkFrame(menu_frame)
@@ -325,7 +390,8 @@ class RestauranteApp(ctk.CTk):
         available_label = ctk.CTkLabel(left_frame, text="Ingredientes Disponibles")
         available_label.pack(pady=5)
         
-        available_list = ttk.Treeview(left_frame, height=8, columns=("cantidad",), show="headings")
+        available_list = ttk.Treeview(left_frame, height=8, columns=("nombre", "cantidad"), show="headings")
+        available_list.heading("nombre", text="Nombre")
         available_list.heading("cantidad", text="Cantidad")
         available_list.pack(fill="x", pady=5)
         
@@ -333,7 +399,8 @@ class RestauranteApp(ctk.CTk):
         selected_label = ctk.CTkLabel(right_frame, text="Ingredientes Seleccionados")
         selected_label.pack(pady=5)
         
-        selected_list = ttk.Treeview(right_frame, height=8, columns=("cantidad",), show="headings")
+        selected_list = ttk.Treeview(right_frame, height=8, columns=("nombre", "cantidad"), show="headings")
+        selected_list.heading("nombre", text="Nombre")
         selected_list.heading("cantidad", text="Cantidad")
         selected_list.pack(fill="x", pady=5)
         
@@ -358,6 +425,33 @@ class RestauranteApp(ctk.CTk):
             border_width=1
         )
         cancel_btn.pack(side="right", padx=10)
+        
+        # Tabla de visualización de menús
+        menus_frame = ctk.CTkFrame(self.main_frame)
+        menus_frame.grid(row=2, column=0, padx=20, pady=20, sticky="ew")
+        
+        table_title = ctk.CTkLabel(
+            menus_frame,
+            text="Lista de Menús",
+            font=ctk.CTkFont(size=16, weight="bold")
+        )
+        table_title.pack(anchor="w", pady=10)
+        
+        menus_table = ttk.Treeview(menus_frame, columns=("nombre", "descripcion"), show="headings", height=8)
+        menus_table.heading("nombre", text="Nombre")
+        menus_table.heading("descripcion", text="Descripción")
+        menus_table.pack(fill="both", padx=10, pady=10)
+        
+        # Botones para actualizar y eliminar
+        action_frame = ctk.CTkFrame(menus_frame, fg_color="transparent")
+        action_frame.pack(fill="x", padx=10, pady=10)
+        
+        update_btn = ctk.CTkButton(action_frame, text="Actualizar Menú", width=150)
+        update_btn.pack(side="left", padx=10)
+        
+        delete_btn = ctk.CTkButton(action_frame, text="Eliminar Menú", width=150)
+        delete_btn.pack(side="left", padx=10)
+
 
     def mostrar_panel_clientes(self):
         self.limpiar_panel()
@@ -469,38 +563,44 @@ class RestauranteApp(ctk.CTk):
         for cliente in cliente_crud.leer_clientes():
             self.tree3.insert("", "end", values=(cliente.nombre,cliente.email,cliente.fecha_registro))
  
+
+
+
+
+
+
     def mostrar_panel_compra(self):
         self.limpiar_panel()
-        
+
         # Header
         header_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
-        header_frame.grid(row=0, column=0, padx=20, pady=(20,10), sticky="ew")
-        
+        header_frame.grid(row=0, column=0, padx=20, pady=(20, 10), sticky="ew")
+
         title = ctk.CTkLabel(
-            header_frame, 
+            header_frame,
             text="Panel de Compra",
             font=ctk.CTkFont(size=24, weight="bold")
         )
         title.pack(side="left")
-        
+
         # Panel principal de compra
         compra_frame = ctk.CTkFrame(self.main_frame)
-        compra_frame.grid(row=1, column=0, padx=20, pady=(0,20), sticky="nsew")
-        
+        compra_frame.grid(row=1, column=0, padx=20, pady=(0, 20), sticky="nsew")
+
         # Selección de cliente
         cliente_frame = ctk.CTkFrame(compra_frame, fg_color="transparent")
         cliente_frame.pack(fill="x", padx=20, pady=10)
-        
+
         cliente_label = ctk.CTkLabel(cliente_frame, text="Seleccionar Cliente:")
         cliente_label.pack(side="left", padx=5)
-        
+
         cliente_combo = ttk.Combobox(cliente_frame, width=40)
         cliente_combo.pack(side="left", padx=5)
-        
+
         # Panel de menús
         menus_frame = ctk.CTkFrame(compra_frame)
         menus_frame.pack(fill="both", expand=True, padx=20, pady=10)
-        
+
         # Lista de menús disponibles
         menus_label = ctk.CTkLabel(
             menus_frame,
@@ -508,58 +608,74 @@ class RestauranteApp(ctk.CTk):
             font=ctk.CTkFont(size=16, weight="bold")
         )
         menus_label.pack(pady=10)
-        
-        menus_list = ttk.Treeview(menus_frame, columns=("precio",), show="headings", height=6)
+
+        menus_list = ttk.Treeview(menus_frame, columns=("nombre", "precio"), show="headings", height=6)
+        menus_list.heading("nombre", text="Nombre")
         menus_list.heading("precio", text="Precio")
         menus_list.pack(fill="x", padx=20, pady=5)
-        
+
+        # Campo para cantidad
+        cantidad_frame = ctk.CTkFrame(menus_frame, fg_color="transparent")
+        cantidad_frame.pack(fill="x", padx=20, pady=5)
+
+        cantidad_label = ctk.CTkLabel(cantidad_frame, text="Cantidad:")
+        cantidad_label.pack(side="left", padx=5)
+
+        cantidad_entry = ctk.CTkEntry(cantidad_frame, width=100)
+        cantidad_entry.pack(side="left", padx=5)
+
         # Botón agregar al carrito
         add_cart_btn = ctk.CTkButton(
             menus_frame,
             text="Agregar al Carrito",
-            width=150
+            width=150,
+            command=lambda: self.agregar_al_carrito(menus_list, cantidad_entry)
         )
         add_cart_btn.pack(pady=10)
-        
+
         # Carrito de compras
         cart_frame = ctk.CTkFrame(compra_frame)
         cart_frame.pack(fill="both", expand=True, padx=20, pady=10)
-        
+
         cart_label = ctk.CTkLabel(
             cart_frame,
             text="Carrito de Compras",
             font=ctk.CTkFont(size=16, weight="bold")
         )
         cart_label.pack(pady=10)
-        
-        cart_list = ttk.Treeview(cart_frame, columns=("cantidad", "precio"), show="headings", height=6)
+
+        cart_list = ttk.Treeview(cart_frame, columns=("nombre", "cantidad", "precio"), show="headings", height=6)
+        cart_list.heading("nombre", text="Nombre")
         cart_list.heading("cantidad", text="Cantidad")
         cart_list.heading("precio", text="Precio")
         cart_list.pack(fill="x", padx=20, pady=5)
-        
+
+        self.cart_list = cart_list  # Guardar referencia para su uso posterior
+
         # Total y botones de acción
         total_frame = ctk.CTkFrame(compra_frame, fg_color="transparent")
         total_frame.pack(fill="x", padx=20, pady=10)
-        
-        total_label = ctk.CTkLabel(
+
+        self.total_label = ctk.CTkLabel(
             total_frame,
-            text="Total:",
+            text="Total: $0.00",
             font=ctk.CTkFont(size=16, weight="bold")
         )
-        total_label.pack(side="right", padx=10)
-        
+        self.total_label.pack(side="right", padx=10)
+
         # Botones finales
         button_frame = ctk.CTkFrame(compra_frame, fg_color="transparent")
         button_frame.pack(fill="x", padx=20, pady=10)
-        
+
         generar_btn = ctk.CTkButton(
             button_frame,
             text="Generar Pedido",
             width=150,
-            height=40
+            height=40,
+            command=self.generar_pedido_pdf
         )
         generar_btn.pack(side="right", padx=10)
-        
+
         cancelar_btn = ctk.CTkButton(
             button_frame,
             text="Cancelar",
@@ -570,13 +686,76 @@ class RestauranteApp(ctk.CTk):
         )
         cancelar_btn.pack(side="right", padx=10)
 
+    # Métodos adicionales
+    def agregar_al_carrito(self, menus_list, cantidad_entry):
+        try:
+            cantidad = int(cantidad_entry.get())
+            if cantidad <= 0:
+                raise ValueError
+        except ValueError:
+            messagebox.showerror("Error", "Ingrese una cantidad válida.")
+            return
 
+        seleccion = menus_list.focus()
+        if not seleccion:
+            messagebox.showerror("Error", "Seleccione un menú para agregar.")
+            return
+
+        valores = menus_list.item(seleccion, "values")
+        nombre, precio = valores[0], float(valores[1])
+
+        self.cart_list.insert("", "end", values=(nombre, cantidad, f"${precio * cantidad:.2f}"))
+        self.actualizar_total()
+
+    def actualizar_total(self):
+        total = 0
+        for item in self.cart_list.get_children():
+            total += float(self.cart_list.item(item, "values")[2][1:])  # Extraer el valor sin el símbolo '$'
+        self.total_label.configure(text=f"Total: ${total:.2f}")
+
+    def generar_pedido_pdf(self):
+        from fpdf import FPDF
+
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Arial", size=12)
+
+        pdf.cell(200, 10, txt="Pedido de Compra", ln=True, align="C")
+        pdf.ln(10)
+
+        pdf.cell(50, 10, txt="Nombre", border=1)
+        pdf.cell(30, 10, txt="Cantidad", border=1)
+        pdf.cell(30, 10, txt="Precio", border=1)
+        pdf.ln()
+
+        for item in self.cart_list.get_children():
+            nombre, cantidad, precio = self.cart_list.item(item, "values")
+            pdf.cell(50, 10, txt=nombre, border=1)
+            pdf.cell(30, 10, txt=str(cantidad), border=1)
+            pdf.cell(30, 10, txt=precio, border=1)
+            pdf.ln()
+
+        pdf.ln(10)
+        pdf.cell(50, 10, txt=self.total_label.cget("text"), align="R")
+
+        pdf_file = "pedido.pdf"
+        pdf.output(pdf_file)
+        messagebox.showinfo("Pedido Generado", f"Pedido guardado como {pdf_file}")
+
+    
+    
+    
+    
+    
+    
+    
+    
     def mostrar_panel_pedidos(self):
         self.limpiar_panel()
         
         # Header
         header_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
-        header_frame.grid(row=0, column=0, padx=20, pady=(20,10), sticky="ew")
+        header_frame.grid(row=0, column=0, padx=20, pady=(20, 10), sticky="ew")
         
         title = ctk.CTkLabel(
             header_frame, 
@@ -587,7 +766,7 @@ class RestauranteApp(ctk.CTk):
         
         # Filtros de búsqueda
         filter_frame = ctk.CTkFrame(self.main_frame)
-        filter_frame.grid(row=1, column=0, padx=20, pady=(0,20), sticky="ew")
+        filter_frame.grid(row=1, column=0, padx=20, pady=(0, 20), sticky="ew")
         
         # Cliente
         cliente_frame = ctk.CTkFrame(filter_frame, fg_color="transparent")
@@ -627,32 +806,15 @@ class RestauranteApp(ctk.CTk):
         
         # Tabla de pedidos
         table_frame = ctk.CTkFrame(self.main_frame)
-        table_frame.grid(row=2, column=0, padx=20, pady=(0,20), sticky="nsew")
+        table_frame.grid(row=2, column=0, padx=20, pady=(0, 20), sticky="nsew")
         self.main_frame.grid_rowconfigure(2, weight=1)
-        
-        # Estilo de la tabla
-        style = ttk.Style()
-        style.configure(
-            "Pedidos.Treeview",
-            background="#2b2b2b",
-            foreground="white",  # Color de las letras en negro
-            fieldbackground="#2b2b2b",
-            borderwidth=0
-        )
-        style.configure(
-            "Pedidos.Treeview.Heading",
-            background="#1f538d",
-            foreground="black",
-            relief="flat"
-        )
         
         # Crear tabla con las columnas requeridas
         columns = ("ID", "Cliente", "Descripción", "Fecha de creación", "Total", "Cantidad de menús")
-        tree = ttk.Treeview(
+        pedidos_tree = ttk.Treeview(
             table_frame,
             columns=columns,
             show="headings",
-            style="Pedidos.Treeview",
             height=15
         )
         
@@ -667,19 +829,29 @@ class RestauranteApp(ctk.CTk):
         }
         
         for col in columns:
-            tree.heading(col, text=col)
-            tree.column(col, width=column_widths[col])
+            pedidos_tree.heading(col, text=col)
+            pedidos_tree.column(col, width=column_widths[col])
         
-        tree.pack(fill="both", expand=True, padx=5, pady=5)
+        pedidos_tree.pack(fill="both", expand=True, padx=5, pady=5)
+        self.pedidos_tree = pedidos_tree  # Guardar referencia para uso posterior
         
         # Scrollbar
-        scrollbar = ctk.CTkScrollbar(table_frame, command=tree.yview)
+        scrollbar = ctk.CTkScrollbar(table_frame, command=pedidos_tree.yview)
         scrollbar.pack(side="right", fill="y")
-        tree.configure(yscrollcommand=scrollbar.set)
+        pedidos_tree.configure(yscrollcommand=scrollbar.set)
+        
+        # Botón para mostrar detalles
+        details_btn = ctk.CTkButton(
+            table_frame,
+            text="Mostrar Detalles de Pedido",
+            width=200,
+            command=self.mostrar_detalles_pedido
+        )
+        details_btn.pack(side="top", pady=10)
         
         # Panel de detalles
         details_frame = ctk.CTkFrame(self.main_frame)
-        details_frame.grid(row=3, column=0, padx=20, pady=(0,20), sticky="ew")
+        details_frame.grid(row=3, column=0, padx=20, pady=(0, 20), sticky="ew")
         
         details_label = ctk.CTkLabel(
             details_frame,
@@ -693,7 +865,6 @@ class RestauranteApp(ctk.CTk):
             details_frame,
             columns=("Menu", "Cantidad", "Precio", "Subtotal"),
             show="headings",
-            style="Pedidos.Treeview",
             height=5
         )
         
@@ -702,6 +873,38 @@ class RestauranteApp(ctk.CTk):
             details_tree.column(col, width=150)
         
         details_tree.pack(fill="x", padx=5, pady=5)
+        self.details_tree = details_tree  # Guardar referencia para uso posterior
+
+    # Método para mostrar detalles del pedido seleccionado
+    def mostrar_detalles_pedido(self):
+        seleccion = self.pedidos_tree.focus()
+        if not seleccion:
+            messagebox.showerror("Error", "Seleccione un pedido para mostrar los detalles.")
+            return
+        
+        pedido = self.pedidos_tree.item(seleccion, "values")
+        pedido_id = pedido[0]  # Obtener el ID del pedido seleccionado
+        
+        # Simulación: Recuperar detalles del pedido desde la base de datos o estructura de datos
+        detalles = [
+            ("Menu 1", 2, "$10.00", "$20.00"),
+            ("Menu 2", 1, "$15.00", "$15.00")
+        ]  # Reemplazar con datos reales
+        
+        # Limpiar tabla de detalles y agregar nuevos datos
+        for item in self.details_tree.get_children():
+            self.details_tree.delete(item)
+        
+        for detalle in detalles:
+            self.details_tree.insert("", "end", values=detalle)
+
+
+
+
+
+
+
+
 
 
     def mostrar_panel_graficos(self):
