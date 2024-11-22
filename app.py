@@ -168,7 +168,7 @@ class RestauranteApp(ctk.CTk):
             border_width=1,
             hover_color=("gray70", "gray30")
         )
-        clear_button.configure(command=self.limpiar_campos)  # Limpia los campos
+        clear_button.configure(command=self.clear_ingrediente)  # Limpia los campos
         clear_button.pack(side="left", padx=10)
 
         # Tabla mejorada
@@ -251,7 +251,15 @@ class RestauranteApp(ctk.CTk):
         self.cantidad_entry.delete(0, "end")
         self.categoria_entry.set("")
         self.unidad_entry.set("")
-
+    
+    def clear_ingrediente(self):
+        """
+        Elimina todos los datos de ingredientes de la base de datos
+        """
+        ingredientes=ingrediente_crud.leer_ingredientes()
+        for ingrediente in ingredientes:
+            ingrediente_crud.eliminar_ingrediente(ingrediente.id)
+        self.Actualizar_Treeview_ingredientes()
 
     def Actualizar_Treeview_ingredientes(self):
         # Limpiar la lista
@@ -260,7 +268,7 @@ class RestauranteApp(ctk.CTk):
 
         # Agregar los ingredientes 
         for ingrediente in ingrediente_crud.leer_ingredientes():
-            self.tree.insert("", "end", values=(ingrediente.nombre,ingrediente.tipo, ingrediente.cantidad, ingrediente.unidad))
+            self.tree.insert("", "end", values=(ingrediente.nombre,ingrediente.tipo, ingrediente.cantidad, ingrediente.categoria, ingrediente.unidad))
     
     def validacion_numero(self, nombre, numero):
         if numero == "":
@@ -291,34 +299,28 @@ class RestauranteApp(ctk.CTk):
         nombre_entry = self.nombre_entry.get()
         tipo = self.tipo_entry.get()
         cantidad = self.cantidad_entry.get()
+        categoria = self.categoria_entry.get()
         unidad = self.unidad_entry.get()
         
-        campos = {'Nombre':nombre_entry,'Tipo':tipo,'Cantidad':cantidad,'Unidad':unidad}
+        campos = {'Nombre':nombre_entry,'Tipo':tipo,'Cantidad':cantidad, 'Categoria':categoria, 'Unidad':unidad}
         for nombre,valor in campos.items():
             result = self.validacion_vacio(nombre,valor)
             if not result:
                 return False
         if not self.validacion_numero('Cantidad',cantidad):
             return False
-        resultado = ingrediente_crud.crear_ingrediente(nombre_entry, tipo, float(cantidad), unidad)
+        resultado = ingrediente_crud.crear_ingrediente(nombre_entry, tipo, float(cantidad),categoria, unidad)
         if resultado:
             messagebox.showinfo(title="Éxito", message="Ingrediente añadido exitosamente")
             # Limpiar los Entry después de agregar el ingrediente
             self.nombre_entry.delete(0, END)
             self.tipo_entry.delete(0, END)
             self.cantidad_entry.delete(0, END)
-            self.unidad_entry.delete(0, END)
+            self.categoria_entry.set("")
+            self.unidad_entry.set("")
         else:
             messagebox.showinfo(title="Éxito", message=f"Ingrediente existente, se suma.")
         self.Actualizar_Treeview_ingredientes()
-
-
-
-
-
-
-
-
 
     def mostrar_panel_menus(self):
         self.limpiar_panel()

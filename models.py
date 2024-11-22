@@ -32,6 +32,7 @@ class Ingrediente(Base):
     nombre = Column(String, unique=True)
     tipo = Column(String)
     cantidad = Column(Float)
+    categoria = Column(String)
     unidad = Column(String)
     
     menus = relationship("Menu", secondary=menu_ingrediente, back_populates="ingredientes")
