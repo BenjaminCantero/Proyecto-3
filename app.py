@@ -143,20 +143,45 @@ class RestauranteApp(ctk.CTk):
                 )
             entry.pack(fill="x", expand=True, padx=5)
             setattr(self, entry_name, entry)
-
         # Botones de acción
+        button_frame = ctk.CTkFrame(form_frame, fg_color="transparent")
+        button_frame.grid(row=1, column=0, columnspan=5, pady=(10, 20), sticky="ew")
+
+                # Botones de acción
         button_frame = ctk.CTkFrame(form_frame, fg_color="transparent")
         button_frame.grid(row=1, column=0, columnspan=5, pady=(10, 20), sticky="ew")
 
         add_button = ctk.CTkButton(
             button_frame,
             text="Añadir Ingrediente",
-            width=200,
+            width=150,
             height=40,
             corner_radius=8
         )
         add_button.configure(command=self.añadir_ingrediente)
-        add_button.pack(side="left", padx=10)
+        add_button.pack(side="left", padx=5)
+
+        update_button = ctk.CTkButton(
+            button_frame,
+            text="Actualizar Ingrediente",
+            width=150,
+            height=40,
+            corner_radius=8,
+            fg_color="green",
+            hover_color="darkgreen"
+        )
+        update_button.pack(side="left", padx=5)
+
+        delete_button = ctk.CTkButton(
+            button_frame,
+            text="Eliminar Ingrediente",
+            width=150,
+            height=40,
+            corner_radius=8,
+            fg_color="red", 
+            hover_color="darkred"
+        )
+        delete_button.pack(side="left", padx=5)
 
         clear_button = ctk.CTkButton(
             button_frame,
@@ -168,7 +193,9 @@ class RestauranteApp(ctk.CTk):
             border_width=1,
             hover_color=("gray70", "gray30")
         )
-        clear_button.configure(command=self.clear_ingrediente)  # Limpia los campos
+        clear_button.configure(command=self.limpiar_campos)
+        clear_button.pack(side="left", padx=5)
+        clear_button.configure(command=self.limpiar_campos)  # Limpia los campos
         clear_button.pack(side="left", padx=10)
 
         # Tabla mejorada
@@ -251,15 +278,7 @@ class RestauranteApp(ctk.CTk):
         self.cantidad_entry.delete(0, "end")
         self.categoria_entry.set("")
         self.unidad_entry.set("")
-    
-    def clear_ingrediente(self):
-        """
-        Elimina todos los datos de ingredientes de la base de datos
-        """
-        ingredientes=ingrediente_crud.leer_ingredientes()
-        for ingrediente in ingredientes:
-            ingrediente_crud.eliminar_ingrediente(ingrediente.id)
-        self.Actualizar_Treeview_ingredientes()
+
 
     def Actualizar_Treeview_ingredientes(self):
         # Limpiar la lista
@@ -268,7 +287,7 @@ class RestauranteApp(ctk.CTk):
 
         # Agregar los ingredientes 
         for ingrediente in ingrediente_crud.leer_ingredientes():
-            self.tree.insert("", "end", values=(ingrediente.nombre,ingrediente.tipo, ingrediente.cantidad, ingrediente.categoria, ingrediente.unidad))
+            self.tree.insert("", "end", values=(ingrediente.nombre,ingrediente.tipo, ingrediente.cantidad, ingrediente.unidad))
     
     def validacion_numero(self, nombre, numero):
         if numero == "":
@@ -299,28 +318,34 @@ class RestauranteApp(ctk.CTk):
         nombre_entry = self.nombre_entry.get()
         tipo = self.tipo_entry.get()
         cantidad = self.cantidad_entry.get()
-        categoria = self.categoria_entry.get()
         unidad = self.unidad_entry.get()
         
-        campos = {'Nombre':nombre_entry,'Tipo':tipo,'Cantidad':cantidad, 'Categoria':categoria, 'Unidad':unidad}
+        campos = {'Nombre':nombre_entry,'Tipo':tipo,'Cantidad':cantidad,'Unidad':unidad}
         for nombre,valor in campos.items():
             result = self.validacion_vacio(nombre,valor)
             if not result:
                 return False
         if not self.validacion_numero('Cantidad',cantidad):
             return False
-        resultado = ingrediente_crud.crear_ingrediente(nombre_entry, tipo, float(cantidad),categoria, unidad)
+        resultado = ingrediente_crud.crear_ingrediente(nombre_entry, tipo, float(cantidad), unidad)
         if resultado:
             messagebox.showinfo(title="Éxito", message="Ingrediente añadido exitosamente")
             # Limpiar los Entry después de agregar el ingrediente
             self.nombre_entry.delete(0, END)
             self.tipo_entry.delete(0, END)
             self.cantidad_entry.delete(0, END)
-            self.categoria_entry.set("")
-            self.unidad_entry.set("")
+            self.unidad_entry.delete(0, END)
         else:
             messagebox.showinfo(title="Éxito", message=f"Ingrediente existente, se suma.")
         self.Actualizar_Treeview_ingredientes()
+
+
+
+
+
+
+
+
 
     def mostrar_panel_menus(self):
         self.limpiar_panel()
@@ -409,7 +434,27 @@ class RestauranteApp(ctk.CTk):
         # Botones de acción
         button_frame = ctk.CTkFrame(menu_frame, fg_color="transparent")
         button_frame.pack(fill="x", padx=20, pady=20)
-        
+
+        update_btn = ctk.CTkButton(
+            button_frame,
+            text="Actualizar Menú",
+            width=150,
+            height=40,
+            fg_color="green",
+            hover_color="darkgreen"
+        )
+        update_btn.pack(side="right", padx=10)
+
+        delete_btn = ctk.CTkButton(
+            button_frame,
+            text="Eliminar Menú",
+            width=150,
+            height=40,
+            fg_color="red",
+            hover_color="darkred"
+        )
+        delete_btn.pack(side="right", padx=10)
+
         save_btn = ctk.CTkButton(
             button_frame,
             text="Guardar Menú",
@@ -417,7 +462,7 @@ class RestauranteApp(ctk.CTk):
             height=40
         )
         save_btn.pack(side="right", padx=10)
-        
+
         cancel_btn = ctk.CTkButton(
             button_frame,
             text="Cancelar",
@@ -427,7 +472,6 @@ class RestauranteApp(ctk.CTk):
             border_width=1
         )
         cancel_btn.pack(side="right", padx=10)
-        
         # Tabla de visualización de menús
         menus_frame = ctk.CTkFrame(self.main_frame)
         menus_frame.grid(row=2, column=0, padx=20, pady=20, sticky="ew")
