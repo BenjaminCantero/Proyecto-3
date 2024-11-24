@@ -170,6 +170,7 @@ class RestauranteApp(ctk.CTk):
             fg_color="green",
             hover_color="darkgreen"
         )
+        update_button.configure(command=self.ActualizarIngrediente)
         update_button.pack(side="left", padx=5)
 
         delete_button = ctk.CTkButton(
@@ -181,6 +182,7 @@ class RestauranteApp(ctk.CTk):
             fg_color="red", 
             hover_color="darkred"
         )
+        delete_button.configure(command=self.EliminarIngrediente)
         delete_button.pack(side="left", padx=5)
 
         clear_button = ctk.CTkButton(
@@ -193,10 +195,8 @@ class RestauranteApp(ctk.CTk):
             border_width=1,
             hover_color=("gray70", "gray30")
         )
-        clear_button.configure(command=self.limpiar_campos)
+        clear_button.configure(command=self.clear_ingrediente)
         clear_button.pack(side="left", padx=5)
-        clear_button.configure(command=self.limpiar_campos)  # Limpia los campos
-        clear_button.pack(side="left", padx=10)
 
         # Tabla mejorada
         table_frame = ctk.CTkFrame(self.main_frame)
@@ -279,7 +279,6 @@ class RestauranteApp(ctk.CTk):
         self.categoria_entry.set("")
         self.unidad_entry.set("")
 
-
     def Actualizar_Treeview_ingredientes(self):
         # Limpiar la lista
         for item in self.tree.get_children():
@@ -287,7 +286,8 @@ class RestauranteApp(ctk.CTk):
 
         # Agregar los ingredientes 
         for ingrediente in ingrediente_crud.leer_ingredientes():
-            self.tree.insert("", "end", values=(ingrediente.nombre,ingrediente.tipo, ingrediente.cantidad, ingrediente.unidad))
+            self.tree.insert("", "end", values=(ingrediente.nombre,ingrediente.tipo, ingrediente.cantidad, ingrediente.categoria, ingrediente.unidad))
+    
     
     def validacion_numero(self, nombre, numero):
         if numero == "":
@@ -318,28 +318,83 @@ class RestauranteApp(ctk.CTk):
         nombre_entry = self.nombre_entry.get()
         tipo = self.tipo_entry.get()
         cantidad = self.cantidad_entry.get()
+        categoria = self.categoria_entry.get()
         unidad = self.unidad_entry.get()
         
-        campos = {'Nombre':nombre_entry,'Tipo':tipo,'Cantidad':cantidad,'Unidad':unidad}
+        campos = {'Nombre':nombre_entry,'Tipo':tipo,'Cantidad':cantidad, 'Categoria':categoria, 'Unidad':unidad}
         for nombre,valor in campos.items():
             result = self.validacion_vacio(nombre,valor)
             if not result:
                 return False
         if not self.validacion_numero('Cantidad',cantidad):
             return False
-        resultado = ingrediente_crud.crear_ingrediente(nombre_entry, tipo, float(cantidad), unidad)
+        resultado = ingrediente_crud.crear_ingrediente(nombre_entry, tipo, float(cantidad),categoria, unidad)
         if resultado:
             messagebox.showinfo(title="Éxito", message="Ingrediente añadido exitosamente")
             # Limpiar los Entry después de agregar el ingrediente
             self.nombre_entry.delete(0, END)
             self.tipo_entry.delete(0, END)
             self.cantidad_entry.delete(0, END)
-            self.unidad_entry.delete(0, END)
+            self.categoria_entry.set("")
+            self.unidad_entry.set("")
         else:
             messagebox.showinfo(title="Éxito", message=f"Ingrediente existente, se suma.")
         self.Actualizar_Treeview_ingredientes()
-
-
+    
+    def EliminarIngrediente(self):
+        seleccion = self.tree.selection()
+        if not seleccion:
+            messagebox.showerror(title="Error", message="Para eliminar un ingrediente primero debe seleccionarlo en la lista.")
+            return
+        item = self.tree.item(seleccion)
+        nombre=item['values'][0]
+        ingrediente_crud.eliminar_ingrediente(1, nombre)
+        self.Actualizar_Treeview_ingredientes()
+    
+    def ActualizarIngrediente(self):
+        seleccion = self.tree.selection()
+        if not seleccion:
+            messagebox.showerror(title="Error", message="Para actualizar un ingrediente primero debe seleccionarlo en la lista.")
+            return
+        item = self.tree.item(seleccion)
+        nombre_entry = item['values'][0]
+        tipo = self.tipo_entry.get()
+        cantidad = self.cantidad_entry.get()
+        categoria = self.categoria_entry.get()
+        unidad = self.unidad_entry.get()
+        contador=0
+        contador2=0
+        campos = {'Nombre':nombre_entry,'Tipo':tipo,'Cantidad':cantidad, 'Categoria':categoria, 'Unidad':unidad}
+        for nombre,valor in campos.items():
+            if item['values'][contador] == valor:
+                contador2+=1
+            contador+=1
+            result = self.validacion_vacio(nombre,valor)
+            if not result:
+                return False
+        if contador2==5:
+            return False
+        if not self.validacion_numero('Cantidad',cantidad):
+            return False
+        resultado = ingrediente_crud.actualizar_ingrediente(-1,nombre_entry, tipo, float(cantidad),categoria, unidad)
+        if resultado:
+            messagebox.showinfo(title="Éxito", message="Ingrediente actualizado exitosamente")
+            # Limpiar los Entry después de agregar el ingrediente
+            self.nombre_entry.delete(0, END)
+            self.tipo_entry.delete(0, END)
+            self.cantidad_entry.delete(0, END)
+            self.categoria_entry.set("")
+            self.unidad_entry.set("")
+        self.Actualizar_Treeview_ingredientes()
+    
+    def clear_ingrediente(self):
+        """
+        Elimina todos los datos de ingredientes de la base de datos
+        """
+        ingredientes=ingrediente_crud.leer_ingredientes()
+        for ingrediente in ingredientes:
+            ingrediente_crud.eliminar_ingrediente(ingrediente.id)
+        self.Actualizar_Treeview_ingredientes()
 
 
 
@@ -513,16 +568,6 @@ class RestauranteApp(ctk.CTk):
         )
         title.pack(side="left")
         
-        # Botón nuevo cliente
-        new_client_btn = ctk.CTkButton(
-            header_frame,
-            text="+ Nuevo Cliente",
-            width=120,
-            height=35
-        )
-        new_client_btn.configure(command=self.añadir_cliente)
-        new_client_btn.pack(side="right")
-        
         # Formulario de cliente
         form_frame = ctk.CTkFrame(self.main_frame)
         form_frame.grid(row=1, column=0, padx=20, pady=(0,20), sticky="ew")
@@ -533,27 +578,54 @@ class RestauranteApp(ctk.CTk):
         
         # Nombre
         nombre_label = ctk.CTkLabel(fields_frame, text="Nombre completo:")
-        nombre_label.pack(anchor="w", padx=5)
+        nombre_label.grid(row=0, column=0, padx=5, pady=(0, 15), sticky="w")
         self.nombre_entryc = ctk.CTkEntry(fields_frame, placeholder_text="Nombre del cliente", width=300)
-        self.nombre_entryc.pack(anchor="w", padx=5, pady=(0,15))
-        
+        self.nombre_entryc.grid(row=0, column=1, padx=5, pady=(0, 15), sticky="w")
         # Email
         email_label = ctk.CTkLabel(fields_frame, text="Correo electrónico:")
-        email_label.pack(anchor="w", padx=5)
+        email_label.grid(row=0, column=2, padx=5, pady=(0, 15), sticky="w")
         self.email_entry = ctk.CTkEntry(fields_frame, placeholder_text="email@ejemplo.com", width=300)
-        self.email_entry.pack(anchor="w", padx=5, pady=(0,15))
+        self.email_entry.grid(row=0, column=3, padx=5, pady=(0, 15), sticky="w")
+
         
         # Botones
         button_frame = ctk.CTkFrame(form_frame, fg_color="transparent")
         button_frame.pack(fill="x", padx=20, pady=10)
         
-        save_btn = ctk.CTkButton(
+        add_button = ctk.CTkButton(
             button_frame,
-            text="Guardar Cliente",
+            text="Nuevo Cliente",
             width=150,
-            height=40
+            height=40,
+            corner_radius=8,
         )
-        save_btn.pack(side="right", padx=10)
+        add_button.configure(command=self.añadir_cliente)
+        add_button.pack(side="left", padx=5)
+
+        delete_button = ctk.CTkButton(
+            button_frame,
+            text="Eliminar Cliente",
+            width=150,
+            height=40,
+            corner_radius=8,
+            fg_color="red", 
+            hover_color="darkred"
+        )
+        delete_button.configure(command=self.EliminarCliente)
+        delete_button.pack(side="left", padx=5)
+
+        clear_button = ctk.CTkButton(
+            button_frame,
+            text="Limpiar",
+            width=100,
+            height=40,
+            corner_radius=8,
+            fg_color="transparent",
+            border_width=1,
+            hover_color=("gray70", "gray30")
+        )
+        clear_button.configure(command=self.clear_cliente)
+        clear_button.pack(side="left", padx=5)
         
         # Lista de clientes
         list_frame = ctk.CTkFrame(self.main_frame)
@@ -575,7 +647,36 @@ class RestauranteApp(ctk.CTk):
         scrollbar.pack(side="right", fill="y")
         self.tree3.configure(yscrollcommand=scrollbar.set)
         self.Actualizar_Treeview_clientes()
+        # Vincular evento de selección
+        self.tree3.bind("<<TreeviewSelect>>", self.seleccionar_ciente)
+        
+    def clear_cliente(self):
+        """
+        Elimina todos los datos de ingredientes de la base de datos
+        """
+        clientes=cliente_crud.leer_clientes()
+        for cliente in clientes:
+            cliente_crud.eliminar_cliente(cliente.id)
+        self.Actualizar_Treeview_clientes()
     
+    def seleccionar_ciente(self, event):
+        """
+        Evento para mostrar los datos del ingrediente seleccionado en los campos de entrada.
+        """
+        selected_item = self.tree3.selection()
+        if not selected_item:
+            return
+
+        # Obtener los valores de la fila seleccionada
+        item_data = self.tree3.item(selected_item[0], "values")
+
+        # Asignar valores a los campos
+        self.nombre_entryc.delete(0, "end")
+        self.nombre_entryc.insert(0, item_data[0])
+
+        self.email_entry.delete(0, "end")
+        self.email_entry.insert(0, item_data[1])
+
     def añadir_cliente(self):
         nombre_c = self.nombre_entryc.get()
         email = self.email_entry.get()
@@ -600,6 +701,16 @@ class RestauranteApp(ctk.CTk):
             elif resultado[1] == 1: mensaje = f'de correo {email}'
             messagebox.showerror(title="Error", message=f"El cliente {mensaje} ya existe")
         
+    def EliminarCliente(self):
+        seleccion = self.tree3.selection()
+        if not seleccion:
+            messagebox.showerror(title="Error", message="Para eliminar un cliente primero debe seleccionarlo en la lista.")
+            return
+        item = self.tree3.item(seleccion)
+        nombre=item['values'][0]
+        cliente_crud.eliminar_cliente(-1, nombre)
+        self.Actualizar_Treeview_clientes()
+    
     def Actualizar_Treeview_clientes(self):
         # Limpiar la lista
         for item in self.tree3.get_children():

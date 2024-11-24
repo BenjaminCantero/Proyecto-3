@@ -35,8 +35,11 @@ class ClienteCRUD:
                 cliente.email = email
             self.session.commit()
 
-    def eliminar_cliente(self, cliente_id:int):
-        cliente = self.session.query(Cliente).filter(Cliente.id == cliente_id).first()
+    def eliminar_cliente(self, cliente_id:int, nombre:str=None, correo:str=None):
+        if cliente_id>-1 : cliente = self.session.query(Cliente).filter(Cliente.id == cliente_id).first()
+        else: cliente = self.session.query(Cliente).filter(Cliente.nombre == nombre).first()
         if cliente:
             self.session.delete(cliente)
             self.session.commit()
+            return True
+        else: False
