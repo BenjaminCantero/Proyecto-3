@@ -22,10 +22,9 @@ class IngredienteCRUD:
         return self.session.query(Ingrediente).all()
 
     def actualizar_ingrediente(self, ingrediente_id:int, nombre:str=None, tipo:str=None, cantidad:int=None, categoria:str=None, unidad:str=None):
-        ingrediente = self.session.query(Ingrediente).filter(Ingrediente.id == ingrediente_id).first()
+        if ingrediente_id>-1: ingrediente = self.session.query(Ingrediente).filter(Ingrediente.id == ingrediente_id).first()
+        else: ingrediente = self.session.query(Ingrediente).filter(Ingrediente.nombre == nombre).first()
         if ingrediente:
-            if nombre:
-                ingrediente.nombre = nombre
             if tipo:
                 ingrediente.tipo = tipo
             if cantidad is not None:
@@ -35,9 +34,19 @@ class IngredienteCRUD:
             if unidad:
                 ingrediente.unidad = unidad
             self.session.commit()
+            return True
+        else: return False
 
-    def eliminar_ingrediente(self, ingrediente_id:int):
-        ingrediente = self.session.query(Ingrediente).filter(Ingrediente.id == ingrediente_id).first()
+    def eliminar_ingrediente(self, ingrediente_id: int, nombre: str = None):
+        # Filtrar por nombre si está presente; de lo contrario, por ID
+        ingrediente = (
+            self.session.query(Ingrediente)
+            .filter(Ingrediente.nombre == nombre) if nombre else
+            self.session.query(Ingrediente)
+            .filter(Ingrediente.id == ingrediente_id)
+        ).first()
+
+        # Si se encontró el ingrediente, eliminarlo
         if ingrediente:
             self.session.delete(ingrediente)
             self.session.commit()
