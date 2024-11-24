@@ -4,14 +4,14 @@ from tkinter import END
 from tkinter import ttk
 from tkinter import messagebox
 import re
-from database import Session
+from database import SessionLocal  # Esto es correcto
 from Crud.cliente_crud import ClienteCRUD
 from Crud.ingrediente_crud import IngredienteCRUD 
 from Crud.menu_crud import MenuCRUD 
 from Crud.pedidos_crud import PedidosCRUD
 
 # Crear una sesión
-session = Session()
+session = SessionLocal()
 
 # Instanciar las clases CRUD
 cliente_crud = ClienteCRUD(session)

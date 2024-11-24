@@ -1,12 +1,11 @@
-#configuracion de base de datos con ORM
-
 from sqlalchemy import create_engine
+from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from models import Base
 
 # Configuración de la base de datos
-DATABASE_URL = 'sqlite:///restaurante.db'  # Cambia a tu base de datos preferida
-engine = create_engine(DATABASE_URL)
-Base.metadata.create_all(engine)
+DATABASE_URL = "sqlite:///./restaurante.db"  # Asegúrate de que el nombre del archivo SQLite sea consistente.
 
-Session = sessionmaker(bind=engine)
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+Base = declarative_base()
