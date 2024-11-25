@@ -425,6 +425,15 @@ class RestauranteApp(ctk.CTk):
         )
         new_menu_btn.pack(side="right")
         
+        # Botón para eliminar menú
+        delete_menu_btn = ctk.CTkButton(
+            header_frame,
+            text="- Eliminar Menú",
+            width=120,
+            command=self.eliminar_menu
+        )
+        delete_menu_btn.pack(side="right")
+        
         # Panel de creación de menú
         menu_frame = ctk.CTkFrame(self.main_frame)
         menu_frame.grid(row=1, column=0, padx=20, pady=(0, 20), sticky="ew")
@@ -444,7 +453,13 @@ class RestauranteApp(ctk.CTk):
         desc_label.pack(anchor="w", padx=5)
         self.desc_text = ctk.CTkTextbox(info_frame, height=60, width=400)
         self.desc_text.pack(anchor="w", padx=5, pady=(0, 10))
-        
+
+        # Precio
+        precio_label = ctk.CTkLabel(info_frame, text="Precio:")
+        precio_label.pack(anchor="w", padx=5)
+        self.precio_entry = ctk.CTkEntry(info_frame, placeholder_text="Ej: 10.99", width=100)
+        self.precio_entry.pack(anchor="w", padx=5, pady=(0, 10))
+
         # Selección de ingredientes
         ingredientes_frame = ctk.CTkFrame(menu_frame)
         ingredientes_frame.pack(fill="x", padx=20, pady=10)
@@ -472,7 +487,7 @@ class RestauranteApp(ctk.CTk):
         available_label = ctk.CTkLabel(left_frame, text="Ingredientes Disponibles")
         available_label.pack(pady=5)
         
-        self.available_list = ttk.Treeview(left_frame, height=8, columns=("nombre", "cantidad"), show="headings")
+        self.available_list = ttk.Treeview(left_frame, height= 8, columns=("nombre", "cantidad"), show="headings")
         self.available_list.heading("nombre", text="Nombre")
         self.available_list.heading("cantidad", text="Cantidad")
         self.available_list.pack(fill="x", pady=5)
@@ -488,6 +503,22 @@ class RestauranteApp(ctk.CTk):
         self.selected_list.heading("nombre", text="Nombre")
         self.selected_list.heading("cantidad", text="Cantidad")
         self.selected_list.pack(fill="x", pady=5)
+        
+        # Lista de menús
+        menus_frame = ctk.CTkFrame(menu_frame)
+        menus_frame.pack(fill="x", padx=20, pady=10)
+        
+        menus_label = ctk.CTkLabel(menus_frame, text="Menús Disponibles")
+        menus_label.pack(pady=5)
+        
+        self.menus_list = ttk.Treeview(menus_frame, height=8, columns=("nombre", "descripcion", "precio"), show="headings")
+        self.menus_list.heading("nombre", text="Nombre")
+        self.menus_list.heading("descripcion", text="Descripción")
+        self.menus_list.heading("precio", text="Precio")
+        self.menus_list.pack(fill="x", pady=5)
+        
+        # Cargar menús disponibles en la lista
+        self.cargar_menus_disponibles()
         
         # Botones de acción
         button_frame = ctk.CTkFrame(menu_frame, fg_color="transparent")
@@ -519,6 +550,7 @@ class RestauranteApp(ctk.CTk):
             command=self.guardar_menu
         )
         save_menu_btn.pack(side="right", padx=10)
+            
 
     def cargar_ingredientes_disponibles(self):
         # Obtener ingredientes disponibles desde la base de datos
@@ -580,6 +612,19 @@ class RestauranteApp(ctk.CTk):
         # Obtener información del menú
         nombre = self.nombre_entrym.get()
         descripcion = self.desc_text.get("1.0", "end-1c")
+        
+        # Obtener el precio
+        precio_str = self.precio_entry.get()
+        try:
+            precio = float(precio_str)
+        except ValueError:
+            messagebox.showerror("Error", "El precio debe ser un número válido.")
+            return
+
+        # Validar que los campos no estén vacíos
+        if not nombre or not descripcion or not precio_str:
+            messagebox.showerror("Error", "Por favor, complete todos los campos.")
+            return
 
         # Obtener ingredientes seleccionados
         selected_ingredients = []
@@ -588,15 +633,43 @@ class RestauranteApp(ctk.CTk):
             selected_ingredients.append((ingrediente[0], ingrediente[1]))  # (nombre, cantidad)
 
         # Guardar menú en la base de datos
-        menu_crud.crear_menu(nombre, descripcion)  # Elimina el precio si no lo estás usando
+        try:
+            menu_crud.crear_menu(nombre, descripcion, precio, selected_ingredients)
+            # Mostrar mensaje de éxito
+            messagebox.showinfo("Menú Guardado", "El menú ha sido guardado exitosamente.")
+            
+            # Limpiar campos
+            self.nombre_entrym.delete(0, "end")
+            self.desc_text.delete("1.0", "end")
+            self.precio_entry.delete(0, "end")
+            
+            # Opcional: Actualizar la lista de menús disponibles
+            self.cargar_menus_disponibles()
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo guardar el menú. Error: {str(e)}")
 
-        # Mostrar mensaje de éxito
-        messagebox.showinfo("Menú Guardado", "El menú ha sido guardado exitosamente.")
+    def eliminar_menu(self):
+        seleccion = self.menus_list.focus()
+        if not seleccion:
+            messagebox.showerror("Error", "Seleccione un menú para eliminar.")
+            return
 
-        # Limpiar campos
-        self.nombre_entrym.delete(0, "end")
-        self.desc_text.delete("1.0", "end")
-        self.selected_list.delete(*self.selected_list.get_children())
+        # Obtener el ID del menú seleccionado
+        menu_id = self.menus_list.item(seleccion, "values")[0]  # Asegúrate de que el ID esté en la primera posición
+
+        # Confirmar la eliminación
+        confirmacion = messagebox.askyesno("Confirmar Eliminación", "¿Está seguro de que desea eliminar este menú?")
+        if not confirmacion:
+            return
+
+        # Llamar a la función de eliminación en el CRUD
+        resultado = menu_crud.eliminar_menu(menu_id)
+
+        if resultado:  # Verifica si la eliminación fue exitosa
+            self.menus_list.delete(seleccion)  # Eliminar el menú de la lista
+            messagebox.showinfo("Menú Eliminado", "El menú ha sido eliminado exitosamente.")
+        else:
+            messagebox.showerror("Error", "No se pudo eliminar el menú. Verifique que exista en la base de datos.")
 
 
 
@@ -765,7 +838,7 @@ class RestauranteApp(ctk.CTk):
         # Agregar los ingredientes 
         for cliente in cliente_crud.leer_clientes():
             self.tree3.insert("", "end", values=(cliente.nombre,cliente.email,cliente.fecha_registro))
- 
+
 
 
 
@@ -797,8 +870,11 @@ class RestauranteApp(ctk.CTk):
         cliente_label = ctk.CTkLabel(cliente_frame, text="Seleccionar Cliente:")
         cliente_label.pack(side="left", padx=5)
 
-        cliente_combo = ttk.Combobox(cliente_frame, width=40)
-        cliente_combo.pack(side="left", padx=5)
+        self.cliente_combo = ttk.Combobox(cliente_frame, width=40)
+        self.cliente_combo.pack(side="left", padx=5)
+
+        # Cargar clientes en el combo
+        self.cargar_clientes()
 
         # Panel de menús
         menus_frame = ctk.CTkFrame(compra_frame)
@@ -812,10 +888,13 @@ class RestauranteApp(ctk.CTk):
         )
         menus_label.pack(pady=10)
 
-        menus_list = ttk.Treeview(menus_frame, columns=("nombre", "precio"), show="headings", height=6)
-        menus_list.heading("nombre", text="Nombre")
-        menus_list.heading("precio", text="Precio")
-        menus_list.pack(fill="x", padx=20, pady=5)
+        self.menus_list = ttk.Treeview(menus_frame, columns=("nombre", "precio"), show="headings", height=6)
+        self.menus_list.heading("nombre", text="Nombre")
+        self.menus_list.heading("precio", text="Precio")
+        self.menus_list.pack(fill="x", padx=20, pady=5)
+
+        # Cargar menús disponibles
+        self.cargar_menus_disponibles()
 
         # Campo para cantidad
         cantidad_frame = ctk.CTkFrame(menus_frame, fg_color="transparent")
@@ -824,17 +903,17 @@ class RestauranteApp(ctk.CTk):
         cantidad_label = ctk.CTkLabel(cantidad_frame, text="Cantidad:")
         cantidad_label.pack(side="left", padx=5)
 
-        cantidad_entry = ctk.CTkEntry(cantidad_frame, width=100)
-        cantidad_entry.pack(side="left", padx=5)
+        self.cantidad_entry = ctk.CTkEntry(cantidad_frame, width=100)
+        self.cantidad_entry.pack(side="left", padx=5)
 
         # Botón agregar al carrito
         add_cart_btn = ctk.CTkButton(
             menus_frame,
             text="Agregar al Carrito",
             width=150,
-            command=lambda: self.agregar_al_carrito(menus_list, cantidad_entry)
+            command=lambda: self.agregar_al_carrito(self.menus_list, self.cantidad_entry)  # Pasar los argumentos necesarios
         )
-        add_cart_btn.pack(pady=10)
+        add_cart_btn.pack(pady =10)
 
         # Carrito de compras
         cart_frame = ctk.CTkFrame(compra_frame)
@@ -847,13 +926,11 @@ class RestauranteApp(ctk.CTk):
         )
         cart_label.pack(pady=10)
 
-        cart_list = ttk.Treeview(cart_frame, columns=("nombre", "cantidad", "precio"), show="headings", height=6)
-        cart_list.heading("nombre", text="Nombre")
-        cart_list.heading("cantidad", text="Cantidad")
-        cart_list.heading("precio", text="Precio")
-        cart_list.pack(fill="x", padx=20, pady=5)
-
-        self.cart_list = cart_list  # Guardar referencia para su uso posterior
+        self.cart_list = ttk.Treeview(cart_frame, columns=("nombre", "cantidad", "precio"), show="headings", height=6)
+        self.cart_list.heading("nombre", text="Nombre")
+        self.cart_list.heading("cantidad", text="Cantidad")
+        self.cart_list.heading("precio", text="Precio")
+        self.cart_list.pack(fill="x", padx=20, pady=5)
 
         # Total y botones de acción
         total_frame = ctk.CTkFrame(compra_frame, fg_color="transparent")
@@ -875,7 +952,7 @@ class RestauranteApp(ctk.CTk):
             text="Generar Pedido",
             width=150,
             height=40,
-            command=self.generar_pedido_pdf
+            command=self.generar_pedido
         )
         generar_btn.pack(side="right", padx=10)
 
@@ -889,25 +966,136 @@ class RestauranteApp(ctk.CTk):
         )
         cancelar_btn.pack(side="right", padx=10)
 
-    # Métodos adicionales
+    def cargar_clientes(self):
+        # Obtener clientes desde la base de datos
+        clientes = cliente_crud.leer_clientes()
+        self.cliente_combo['values'] = [cliente.nombre for cliente in clientes]
+
+    def cargar_menus_disponibles(self):
+        # Obtener menús disponibles desde la base de datos
+        menus = menu_crud.leer_menus()
+        for menu in menus:
+            self.menus_list.insert("", "end", values=(menu.nombre, menu.precio))
+
     def agregar_al_carrito(self, menus_list, cantidad_entry):
+        # Intentar convertir la entrada de cantidad a un entero
         try:
             cantidad = int(cantidad_entry.get())
             if cantidad <= 0:
-                raise ValueError
-        except ValueError:
-            messagebox.showerror("Error", "Ingrese una cantidad válida.")
+                raise ValueError("La cantidad debe ser mayor que cero.")
+        except ValueError as e:
+            messagebox.showerror("Error", f"Ingrese una cantidad válida. {str(e)}")
             return
 
+        # Obtener el elemento seleccionado en menus_list
         seleccion = menus_list.focus()
         if not seleccion:
             messagebox.showerror("Error", "Seleccione un menú para agregar.")
             return
 
+        # Obtener los valores del elemento seleccionado
         valores = menus_list.item(seleccion, "values")
+        if not valores or len(valores) < 2:
+            messagebox.showerror("Error", "No se pudo obtener la información del menú seleccionado.")
+            return
+
+        # Verificar que el precio sea un valor válido
+        try:
+            nombre, precio = valores[0], float(valores[1])
+        except (ValueError, TypeError) as e:
+            messagebox.showerror("Error", "El precio del menú seleccionado no es válido.")
+            return
+
+        # Insertar el artículo en el carrito
+        self.cart_list.insert("", "end", values=(nombre, cantidad, f"${precio * cantidad:.2f}"))
+        
+        # Actualizar el total del carrito
+        self.actualizar_total()
+
+    def actualizar_total(self):
+        total = 0
+        for item in self.cart_list.get_children():
+            total += float(self.cart_list.item(item, "values")[2][1:])  # Extraer el valor sin el símbolo '$'
+        self.total_label.configure(text=f"Total: ${total:.2f}")
+
+    def generar_pedido(self):
+        cliente_seleccionado = self.cliente_combo.get()
+        if not cliente_seleccionado:
+            messagebox.showerror("Error", "Seleccione un cliente para realizar el pedido.")
+            return
+
+        # Aquí puedes agregar la lógica para guardar el pedido en la base de datos
+        # y disminuir la cantidad de ingredientes necesarios.
+
+        messagebox.showinfo("Pedido Generado", "El pedido ha sido generado exitosamente.")
+        self.limpiar_carrito()
+
+    def limpiar_carrito(self):
+        self.cart_list.delete(*self.cart_list.get_children())
+        self.total_label.configure(text="Total: $0.00")
+        self.cantidad_entry.delete(0, "end")
+
+    def generar_pedido(self):
+        cliente_seleccionado = self.cliente_combo.get()
+        if not cliente_seleccionado:
+            messagebox.showerror("Error", "Seleccione un cliente para realizar el pedido.")
+            return
+
+        # Obtener los ingredientes del carrito
+        for item in self.cart_list.get_children():
+            nombre_menu, cantidad, _ = self.cart_list.item(item, "values")
+            # Obtener los ingredientes del menú
+            ingredientes = menu_crud.obtener_ingredientes_por_menu(nombre_menu)
+            
+            for ingrediente in ingredientes:
+                # Disminuir la cantidad del ingrediente
+                ingrediente_crud.disminuir_ingrediente(ingrediente.nombre, ingrediente.cantidad * cantidad)
+
+        messagebox.showinfo("Pedido Generado", "El pedido ha sido generado exitosamente.")
+        self.limpiar_carrito()
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+    # Métodos adicionales
+    def agregar_al_carrito(self, menus_list, cantidad_entry):
+        # Intentar convertir la entrada de cantidad a un entero
+        try:
+            cantidad = int(cantidad_entry.get())
+            if cantidad <= 0:
+                raise ValueError("La cantidad debe ser mayor que cero.")
+        except ValueError as e:
+            messagebox.showerror("Error", f"Ingrese una cantidad válida. {str(e)}")
+            return
+
+        # Obtener el elemento seleccionado en menus_list
+        seleccion = menus_list.focus()
+        if not seleccion:
+            messagebox.showerror("Error", "Seleccione un menú para agregar.")
+            return
+
+        # Obtener los valores del elemento seleccionado
+        valores = menus_list.item(seleccion, "values")
+        if not valores or len(valores) < 2:
+            messagebox.showerror("Error", "No se pudo obtener la información del menú seleccionado.")
+            return
+
         nombre, precio = valores[0], float(valores[1])
 
+        # Insertar el artículo en el carrito
         self.cart_list.insert("", "end", values=(nombre, cantidad, f"${precio * cantidad:.2f}"))
+        
+        # Actualizar el total del carrito
         self.actualizar_total()
 
     def actualizar_total(self):

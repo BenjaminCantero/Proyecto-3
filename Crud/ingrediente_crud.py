@@ -56,3 +56,9 @@ class IngredienteCRUD:
 
     def obtener_ingrediente_por_nombre(self, nombre: str):
         return self.session.query(Ingrediente).filter_by(nombre=nombre).first()
+    
+    def disminuir_ingrediente(self, nombre, cantidad):
+        ingrediente = self.leer_ingrediente_por_nombre(nombre)
+        if ingrediente and ingrediente.cantidad >= cantidad:
+            ingrediente.cantidad -= cantidad
+            self.session.commit()
