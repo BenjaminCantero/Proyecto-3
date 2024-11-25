@@ -1,50 +1,59 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Table
+# Definicion de los modelos ORM
+
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey, Table
+from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
-from datetime import datetime
-from database import Base  # Asegúrate de que `Base` venga de `database.py`
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+
+Base = declarative_base()
 
 # Tabla intermedia para la relación N:M entre Menu e Ingrediente
-menu_ingrediente = Table(
-    'menu_ingrediente', Base.metadata,
+menu_ingrediente = Table('menu_ingrediente', Base.metadata,
     Column('menu_id', Integer, ForeignKey('menu.id')),
     Column('ingrediente_id', Integer, ForeignKey('ingrediente.id'))
 )
 
 class Cliente(Base):
-    __tablename__ = 'clientes'
-
+    __tablename__ = 'cliente'
+    
     id = Column(Integer, primary_key=True)
-    nombre = Column(String, nullable=False)
-    email = Column(String, nullable=False)
+    nombre = Column(String, unique=True)
+    email = Column(String, unique=True)
+    # Definición de la columna con precisión hasta segundos
+    fecha_registro = Column(DateTime, default=lambda: datetime.now(ZoneInfo("America/Santiago")).replace(microsecond=0))
+    
     pedidos = relationship("Pedido", back_populates="cliente")
 
 class Ingrediente(Base):
     __tablename__ = 'ingrediente'
-
+    
     id = Column(Integer, primary_key=True)
     nombre = Column(String, unique=True)
     tipo = Column(String)
     cantidad = Column(Float)
     categoria = Column(String)
     unidad = Column(String)
+    
     menus = relationship("Menu", secondary=menu_ingrediente, back_populates="ingredientes")
 
 class Menu(Base):
     __tablename__ = 'menu'
-
+    
     id = Column(Integer, primary_key=True)
     nombre = Column(String)
     descripcion = Column(String)
+    precio = Column(Float) 
+    
     ingredientes = relationship("Ingrediente", secondary=menu_ingrediente, back_populates="menus")
 
 class Pedido(Base):
-    __tablename__ = 'pedidos'
-
+    __tablename__ = 'pedido'
+    
     id = Column(Integer, primary_key=True)
-    cliente_id = Column(Integer, ForeignKey('clientes.id'), nullable=False)
-    descripcion = Column(String, nullable=False)
-    total = Column(Float, nullable=False)
-    fecha_creacion = Column(DateTime, default=datetime.utcnow)
-    cantidad_menus = Column(Integer, nullable=False)
-    estado = Column(String, nullable=False)
+    cliente_id = Column(Integer, ForeignKey('cliente.id'))
+    fecha_pedido = Column(DateTime, default=lambda: datetime.now(ZoneInfo("America/Santiago")).replace(microsecond=0))
+    total = Column(Float)
+    estado = Column(String)
+    
     cliente = relationship("Cliente", back_populates="pedidos")
