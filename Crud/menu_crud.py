@@ -5,7 +5,7 @@ class MenuCRUD:
     def __init__(self, session):
         self.session = session
 
-    def crear_menu(self, nombre:str, descripcion:str):
+    def crear_menu(self, nombre: str, descripcion: str):
         nuevo_menu = Menu(nombre=nombre, descripcion=descripcion)
         self.session.add(nuevo_menu)
         self.session.commit()

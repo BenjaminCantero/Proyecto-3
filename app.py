@@ -421,7 +421,7 @@ class RestauranteApp(ctk.CTk):
             header_frame,
             text="+ Nuevo Menú",
             width=120,
-            height=35
+            command=self.crear_nuevo_menu
         )
         new_menu_btn.pack(side="right")
         
@@ -472,86 +472,132 @@ class RestauranteApp(ctk.CTk):
         available_label = ctk.CTkLabel(left_frame, text="Ingredientes Disponibles")
         available_label.pack(pady=5)
         
-        available_list = ttk.Treeview(left_frame, height=8, columns=("nombre", "cantidad"), show="headings")
-        available_list.heading("nombre", text="Nombre")
-        available_list.heading("cantidad", text="Cantidad")
-        available_list.pack(fill="x", pady=5)
+        self.available_list = ttk.Treeview(left_frame, height=8, columns=("nombre", "cantidad"), show="headings")
+        self.available_list.heading("nombre", text="Nombre")
+        self.available_list.heading("cantidad", text="Cantidad")
+        self.available_list.pack(fill="x", pady=5)
+        
+        # Cargar ingredientes disponibles en la lista
+        self.cargar_ingredientes_disponibles()
         
         # Ingredientes seleccionados
         selected_label = ctk.CTkLabel(right_frame, text="Ingredientes Seleccionados")
         selected_label.pack(pady=5)
         
-        selected_list = ttk.Treeview(right_frame, height=8, columns=("nombre", "cantidad"), show="headings")
-        selected_list.heading("nombre", text="Nombre")
-        selected_list.heading("cantidad", text="Cantidad")
-        selected_list.pack(fill="x", pady=5)
+        self.selected_list = ttk.Treeview(right_frame, height=8, columns=("nombre", "cantidad"), show="headings")
+        self.selected_list.heading("nombre", text="Nombre")
+        self.selected_list.heading("cantidad", text="Cantidad")
+        self.selected_list.pack(fill="x", pady=5)
         
         # Botones de acción
         button_frame = ctk.CTkFrame(menu_frame, fg_color="transparent")
-        button_frame.pack(fill="x", padx=20, pady=20)
-
-        update_btn = ctk.CTkButton(
+        button_frame.pack(fill="x", padx=20, pady=10)
+        
+        # Botón agregar ingrediente
+        add_ing_btn = ctk.CTkButton(
             button_frame,
-            text="Actualizar Menú",
+            text="Agregar Ingrediente",
             width=150,
-            height=40,
-            fg_color="green",
-            hover_color="darkgreen"
+            command=self.agregar_ingrediente
         )
-        update_btn.pack(side="right", padx=10)
-
-        delete_btn = ctk.CTkButton(
+        add_ing_btn.pack(side="left", padx=10)
+        
+        # Botón quitar ingrediente
+        remove_ing_btn = ctk.CTkButton(
             button_frame,
-            text="Eliminar Menú",
+            text="Quitar Ingrediente",
             width=150,
-            height=40,
-            fg_color="red",
-            hover_color="darkred"
+            command=self.quitar_ingrediente
         )
-        delete_btn.pack(side="right", padx=10)
-
-        save_btn = ctk.CTkButton(
+        remove_ing_btn.pack(side="left", padx=10)
+        
+        # Botón guardar menú
+        save_menu_btn = ctk.CTkButton(
             button_frame,
             text="Guardar Menú",
             width=150,
-            height=40
+            command=self.guardar_menu
         )
-        save_btn.pack(side="right", padx=10)
+        save_menu_btn.pack(side="right", padx=10)
 
-        cancel_btn = ctk.CTkButton(
-            button_frame,
-            text="Cancelar",
-            width=100,
-            height=40,
-            fg_color="transparent",
-            border_width=1
-        )
-        cancel_btn.pack(side="right", padx=10)
-        # Tabla de visualización de menús
-        menus_frame = ctk.CTkFrame(self.main_frame)
-        menus_frame.grid(row=2, column=0, padx=20, pady=20, sticky="ew")
+    def cargar_ingredientes_disponibles(self):
+        # Obtener ingredientes disponibles desde la base de datos
+        ingredientes = ingrediente_crud.leer_ingredientes()
+
+        # Limpiar la lista
+        for item in self.available_list.get_children():
+            self.available_list.delete(item)
+
+        # Agregar ingredientes a la lista
+        for ingrediente in ingredientes:
+            self.available_list.insert("", "end", values=(ingrediente.nombre, ingrediente.cantidad))
+
+    def agregar_ingrediente(self):
+        # Obtener el ingrediente seleccionado de la lista de ingredientes disponibles
+        seleccion = self.available_list.focus()
+        if not seleccion:
+            messagebox.showerror("Error", "Seleccione un ingrediente para agregar.")
+            return
+
+        # Obtener los valores del ingrediente seleccionado
+        ingrediente = self.available_list.item(seleccion, "values")
+        nombre_ingrediente = ingrediente[0]
+        cantidad_ingrediente = 1  # Puedes permitir que el usuario seleccione la cantidad
+
+        # Verificar si el ingrediente ya está en la lista de ingredientes seleccionados
+        for item in self.selected_list.get_children():
+            if self.selected_list.item(item, "values")[0] == nombre_ingrediente:
+                messagebox.showwarning("Advertencia", f"El ingrediente '{nombre_ingrediente}' ya está en la lista de seleccionados.")
+                return
+
+        # Agregar el ingrediente a la lista de ingredientes seleccionados
+        self.selected_list.insert("", "end", values=(nombre_ingrediente, cantidad_ingrediente))
+
+    def quitar_ingrediente(self):
+        seleccion = self.selected_list.focus()
+        if not seleccion:
+            messagebox.showerror("Error", "Seleccione un ingrediente para quitar.")
+            return
+
+        # Eliminar el ingrediente seleccionado de la lista
+        self.selected_list.delete(seleccion)
+
+
+    def crear_nuevo_menu(self):
+        # Limpiar los campos de entrada
+        self.nombre_entrym.delete(0, "end")
+        self.desc_text.delete("1.0", "end")
         
-        table_title = ctk.CTkLabel(
-            menus_frame,
-            text="Lista de Menús",
-            font=ctk.CTkFont(size=16, weight="bold")
-        )
-        table_title.pack(anchor="w", pady=10)
-        
-        menus_table = ttk.Treeview(menus_frame, columns=("nombre", "descripcion"), show="headings", height=8)
-        menus_table.heading("nombre", text="Nombre")
-        menus_table.heading("descripcion", text="Descripción")
-        menus_table.pack(fill="both", padx=10, pady=10)
-        
-        # Botones para actualizar y eliminar
-        action_frame = ctk.CTkFrame(menus_frame, fg_color="transparent")
-        action_frame.pack(fill="x", padx=10, pady=10)
-        
-        update_btn = ctk.CTkButton(action_frame, text="Actualizar Menú", width=150)
-        update_btn.pack(side="left", padx=10)
-        
-        delete_btn = ctk.CTkButton(action_frame, text="Eliminar Menú", width=150)
-        delete_btn.pack(side="left", padx=10)
+        # Limpiar la lista de ingredientes seleccionados
+        for item in self.selected_list.get_children():
+            self.selected_list.delete(item)
+
+        # Opcional: Puedes cargar los ingredientes disponibles nuevamente si es necesario
+        self.cargar_ingredientes_disponibles()
+
+
+    def guardar_menu(self):
+        # Obtener información del menú
+        nombre = self.nombre_entrym.get()
+        descripcion = self.desc_text.get("1.0", "end-1c")
+
+        # Obtener ingredientes seleccionados
+        selected_ingredients = []
+        for item in self.selected_list.get_children():
+            ingrediente = self.selected_list.item(item, "values")
+            selected_ingredients.append((ingrediente[0], ingrediente[1]))  # (nombre, cantidad)
+
+        # Guardar menú en la base de datos
+        menu_crud.crear_menu(nombre, descripcion)  # Elimina el precio si no lo estás usando
+
+        # Mostrar mensaje de éxito
+        messagebox.showinfo("Menú Guardado", "El menú ha sido guardado exitosamente.")
+
+        # Limpiar campos
+        self.nombre_entrym.delete(0, "end")
+        self.desc_text.delete("1.0", "end")
+        self.selected_list.delete(*self.selected_list.get_children())
+
 
 
     def mostrar_panel_clientes(self):
