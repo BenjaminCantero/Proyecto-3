@@ -43,6 +43,7 @@ class Menu(Base):
     id = Column(Integer, primary_key=True)
     nombre = Column(String)
     descripcion = Column(String)
+    precio = Column(Float) 
     
     ingredientes = relationship("Ingrediente", secondary=menu_ingrediente, back_populates="menus")
 
