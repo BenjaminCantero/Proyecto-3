@@ -9,6 +9,11 @@ from Crud.cliente_crud import ClienteCRUD
 from Crud.ingrediente_crud import IngredienteCRUD 
 from Crud.menu_crud import MenuCRUD 
 from Crud.pedidos_crud import PedidosCRUD
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import numpy as np
+from datetime import datetime, timedelta
+from fpdf import FPDF
 
 # Crear una sesión
 session = Session()
@@ -41,40 +46,26 @@ class RestauranteApp(ctk.CTk):
         self.sidebar.grid_rowconfigure(7, weight=1)  # Espacio flexible al final
         
         # Logo o título del restaurante
-        self.logo_label = ctk.CTkLabel(
-            self.sidebar, 
-            text="RESTAURANTE\nGESTIÓN", 
-            font=ctk.CTkFont(size=20, weight="bold"),
-            pady=20
-        )
-        self.logo_label.grid(row=0, column=0, padx=20, pady=(20, 20))
+        self.logo_label = ctk.CTkLabel(self.sidebar, text="RESTAURANTE\nGESTIÓN", font=ctk.CTkFont(size=20, weight="bold"))
+        self.logo_label.grid(row=0, column=0, padx=20, pady=20)
         
-        # Botones de navegación mejorados
+        # Botones de navegación
         self.nav_buttons = []
         nav_items = [
-            ("Ingredientes", "mostrar_panel_ingredientes"),
-            ("Menús", "mostrar_panel_menus"),
-            ("Clientes", "mostrar_panel_clientes"),
-            ("Compras", "mostrar_panel_compra"),
-            ("Pedidos", "mostrar_panel_pedidos"),
-            ("Gráficos", "mostrar_panel_graficos")
+            ("Ingredientes", self.mostrar_panel_ingredientes),
+            ("Menús", self.mostrar_panel_menus),
+            ("Clientes", self.mostrar_panel_clientes),
+            ("Compras", self.mostrar_panel_compra),
+            ("Pedidos", self.mostrar_panel_pedidos),
+            ("Gráficos", self.mostrar_panel_graficos)
         ]
         
         for idx, (text, command) in enumerate(nav_items, start=1):
-            btn = ctk.CTkButton(
-                self.sidebar,
-                text=text,
-                height=40,
-                corner_radius=8,
-                command=getattr(self, command),
-                fg_color="transparent",
-                hover_color=("gray70", "gray30"),
-                anchor="center"
-            )
+            btn = ctk.CTkButton(self.sidebar, text=text, height=40, corner_radius=8, command=command, fg_color="transparent")
             btn.grid(row=idx, column=0, padx=20, pady=10, sticky="ew")
             self.nav_buttons.append(btn)
         
-        # Marco principal con diseño mejorado
+        # Marco principal
         self.main_frame = ctk.CTkFrame(self, corner_radius=10)
         self.main_frame.grid(row=0, column=1, padx=20, pady=20, sticky="nsew")
         self.main_frame.grid_columnconfigure(0, weight=1)
@@ -409,34 +400,67 @@ class RestauranteApp(ctk.CTk):
         header_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         header_frame.grid(row=0, column=0, padx=20, pady=(20, 10), sticky="ew")
         
-        title = ctk.CTkLabel(
-            header_frame,
-            text="Gestión de Menús",
-            font=ctk.CTkFont(size=24, weight="bold")
-        )
+        title = ctk.CTkLabel(header_frame, text="Gestión de Menús", font=ctk.CTkFont(size=24, weight="bold"))
         title.pack(side="left")
         
-        # Botón para nuevo menú
-        new_menu_btn = ctk.CTkButton(
-            header_frame,
-            text="+ Nuevo Menú",
-            width=120,
-            command=self.crear_nuevo_menu
-        )
+        # Botones del header
+        new_menu_btn = ctk.CTkButton(header_frame, text="+ Nuevo Menú", width=120, command=self.crear_nuevo_menu)
         new_menu_btn.pack(side="right")
         
-        # Botón para eliminar menú
-        delete_menu_btn = ctk.CTkButton(
-            header_frame,
-            text="- Eliminar Menú",
-            width=120,
-            command=self.eliminar_menu
-        )
-        delete_menu_btn.pack(side="right")
+        delete_menu_btn = ctk.CTkButton(header_frame, text="- Eliminar Menú", width=120, command=self.eliminar_menu)
+        delete_menu_btn.pack(side="right", padx=10)
         
-        # Panel de creación de menú
-        menu_frame = ctk.CTkFrame(self.main_frame)
-        menu_frame.grid(row=1, column=0, padx=20, pady=(0, 20), sticky="ew")
+        # Frame principal con scrollbar
+        main_scroll_frame = ctk.CTkFrame(self.main_frame)
+        main_scroll_frame.grid(row=1, column=0, padx=20, pady=(0, 20), sticky="nsew")
+        self.main_frame.grid_rowconfigure(1, weight=1)
+        self.main_frame.grid_columnconfigure(0, weight=1)
+
+        # Configuración del contenedor con scrollbar
+        content_frame = ctk.CTkFrame(main_scroll_frame)
+        content_frame.pack(side="left", fill="both", expand=True, padx=(0, 10))
+
+        # Scrollbar
+        scrollbar = ctk.CTkScrollbar(main_scroll_frame, orientation="vertical")
+        scrollbar.pack(side="right", fill="y")
+
+        # Canvas con tema oscuro
+        canvas = tk.Canvas(
+            content_frame,
+            yscrollcommand=scrollbar.set,
+            bg='#2b2b2b',
+            highlightthickness=0,
+            width=950
+        )
+        canvas.pack(side="left", fill="both", expand=True)
+
+        # Configurar scrollbar
+        scrollbar.configure(command=canvas.yview)
+
+        # Frame para contenido
+        menu_frame = ctk.CTkFrame(canvas)
+        canvas_window = canvas.create_window(
+            (0, 0),
+            window=menu_frame,
+            anchor="nw",
+            width=canvas.winfo_reqwidth()
+        )
+
+        # Eventos de configuración
+        def on_configure(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+            canvas.itemconfig(
+                canvas_window,
+                width=max(event.width, 950)
+            )
+
+        menu_frame.bind("<Configure>", on_configure)
+
+        def on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        canvas.bind_all("<MouseWheel>", on_mousewheel)
+
+        # CONTENIDO DEL PANEL DE MENÚ
         
         # Información básica del menú
         info_frame = ctk.CTkFrame(menu_frame, fg_color="transparent")
@@ -448,7 +472,7 @@ class RestauranteApp(ctk.CTk):
         self.nombre_entrym = ctk.CTkEntry(info_frame, placeholder_text="Ej: Completo Italiano", width=300)
         self.nombre_entrym.pack(anchor="w", padx=5, pady=(0, 10))
         
-        # Descripción
+        # Descripci��n
         desc_label = ctk.CTkLabel(info_frame, text="Descripción:")
         desc_label.pack(anchor="w", padx=5)
         self.desc_text = ctk.CTkTextbox(info_frame, height=60, width=400)
@@ -465,11 +489,7 @@ class RestauranteApp(ctk.CTk):
         ingredientes_frame.pack(fill="x", padx=20, pady=10)
         
         # Título de ingredientes
-        ing_title = ctk.CTkLabel(
-            ingredientes_frame,
-            text="Ingredientes del Menú",
-            font=ctk.CTkFont(size=16, weight="bold")
-        )
+        ing_title = ctk.CTkLabel(ingredientes_frame, text="Ingredientes del Menú", font=ctk.CTkFont(size=16, weight="bold"))
         ing_title.pack(pady=10)
         
         # Lista de ingredientes disponibles
@@ -487,7 +507,7 @@ class RestauranteApp(ctk.CTk):
         available_label = ctk.CTkLabel(left_frame, text="Ingredientes Disponibles")
         available_label.pack(pady=5)
         
-        self.available_list = ttk.Treeview(left_frame, height= 8, columns=("nombre", "cantidad"), show="headings")
+        self.available_list = ttk.Treeview(left_frame, height=8, columns=("nombre", "cantidad"), show="headings")
         self.available_list.heading("nombre", text="Nombre")
         self.available_list.heading("cantidad", text="Cantidad")
         self.available_list.pack(fill="x", pady=5)
@@ -524,33 +544,18 @@ class RestauranteApp(ctk.CTk):
         button_frame = ctk.CTkFrame(menu_frame, fg_color="transparent")
         button_frame.pack(fill="x", padx=20, pady=10)
         
-        # Botón agregar ingrediente
-        add_ing_btn = ctk.CTkButton(
-            button_frame,
-            text="Agregar Ingrediente",
-            width=150,
-            command=self.agregar_ingrediente
-        )
+        add_ing_btn = ctk.CTkButton(button_frame, text="Agregar Ingrediente", width=150, command=self.agregar_ingrediente)
         add_ing_btn.pack(side="left", padx=10)
         
-        # Botón quitar ingrediente
-        remove_ing_btn = ctk.CTkButton(
-            button_frame,
-            text="Quitar Ingrediente",
-            width=150,
-            command=self.quitar_ingrediente
-        )
+        remove_ing_btn = ctk.CTkButton(button_frame, text="Quitar Ingrediente", width=150, command=self.quitar_ingrediente)
         remove_ing_btn.pack(side="left", padx=10)
         
-        # Botón guardar menú
-        save_menu_btn = ctk.CTkButton(
-            button_frame,
-            text="Guardar Menú",
-            width=150,
-            command=self.guardar_menu
-        )
+        save_menu_btn = ctk.CTkButton(button_frame, text="Guardar Menú", width=150, command=self.guardar_menu)
         save_menu_btn.pack(side="right", padx=10)
-            
+
+    def limpiar_panel(self):
+        for widget in self.main_frame.winfo_children():
+            widget.destroy()
 
     def cargar_ingredientes_disponibles(self):
         # Obtener ingredientes disponibles desde la base de datos
@@ -859,10 +864,58 @@ class RestauranteApp(ctk.CTk):
         )
         title.pack(side="left")
 
-        # Panel principal de compra
-        compra_frame = ctk.CTkFrame(self.main_frame)
-        compra_frame.grid(row=1, column=0, padx=20, pady=(0, 20), sticky="nsew")
+        # Frame principal con scrollbar
+        main_scroll_frame = ctk.CTkFrame(self.main_frame)
+        main_scroll_frame.grid(row=1, column=0, padx=20, pady=(0, 20), sticky="nsew")
+        self.main_frame.grid_rowconfigure(1, weight=1)
+        self.main_frame.grid_columnconfigure(0, weight=1)
 
+        # Configuración del contenedor con scrollbar
+        content_frame = ctk.CTkFrame(main_scroll_frame)
+        content_frame.pack(side="left", fill="both", expand=True, padx=(0, 10))
+
+        # Scrollbar
+        scrollbar = ctk.CTkScrollbar(main_scroll_frame, orientation="vertical")
+        scrollbar.pack(side="right", fill="y")
+
+        # Canvas con tema oscuro
+        canvas = tk.Canvas(
+            content_frame,
+            yscrollcommand=scrollbar.set,
+            bg='#2b2b2b',
+            highlightthickness=0,
+            width=950
+        )
+        canvas.pack(side="left", fill="both", expand=True)
+
+        # Configurar scrollbar
+        scrollbar.configure(command=canvas.yview)
+
+        # Frame para contenido
+        compra_frame = ctk.CTkFrame(canvas)
+        canvas_window = canvas.create_window(
+            (0, 0),
+            window=compra_frame,
+            anchor="nw",
+            width=canvas.winfo_reqwidth()
+        )
+
+        # Eventos de configuración
+        def on_configure(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+            canvas.itemconfig(
+                canvas_window,
+                width=max(event.width, 950)
+            )
+
+        compra_frame.bind("<Configure>", on_configure)
+
+        def on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        canvas.bind_all("<MouseWheel>", on_mousewheel)
+
+        # CONTENIDO DEL PANEL DE COMPRA
+        
         # Selección de cliente
         cliente_frame = ctk.CTkFrame(compra_frame, fg_color="transparent")
         cliente_frame.pack(fill="x", padx=20, pady=10)
@@ -873,14 +926,13 @@ class RestauranteApp(ctk.CTk):
         self.cliente_combo = ttk.Combobox(cliente_frame, width=40)
         self.cliente_combo.pack(side="left", padx=5)
 
-        # Cargar clientes en el combo
+        # Cargar clientes
         self.cargar_clientes()
 
         # Panel de menús
         menus_frame = ctk.CTkFrame(compra_frame)
-        menus_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        menus_frame.pack(fill="x", padx=20, pady=10)
 
-        # Lista de menús disponibles
         menus_label = ctk.CTkLabel(
             menus_frame,
             text="Menús Disponibles",
@@ -888,15 +940,13 @@ class RestauranteApp(ctk.CTk):
         )
         menus_label.pack(pady=10)
 
+        # Lista de menús
         self.menus_list = ttk.Treeview(menus_frame, columns=("nombre", "precio"), show="headings", height=6)
         self.menus_list.heading("nombre", text="Nombre")
         self.menus_list.heading("precio", text="Precio")
         self.menus_list.pack(fill="x", padx=20, pady=5)
 
-        # Cargar menús disponibles
-        self.cargar_menus_disponibles()
-
-        # Campo para cantidad
+        # Cantidad
         cantidad_frame = ctk.CTkFrame(menus_frame, fg_color="transparent")
         cantidad_frame.pack(fill="x", padx=20, pady=5)
 
@@ -906,18 +956,18 @@ class RestauranteApp(ctk.CTk):
         self.cantidad_entry = ctk.CTkEntry(cantidad_frame, width=100)
         self.cantidad_entry.pack(side="left", padx=5)
 
-        # Botón agregar al carrito
+        # Botón agregar
         add_cart_btn = ctk.CTkButton(
             menus_frame,
             text="Agregar al Carrito",
             width=150,
-            command=lambda: self.agregar_al_carrito(self.menus_list, self.cantidad_entry)  # Pasar los argumentos necesarios
+            command=lambda: self.agregar_al_carrito(self.menus_list, self.cantidad_entry)
         )
-        add_cart_btn.pack(pady =10)
+        add_cart_btn.pack(pady=10)
 
-        # Carrito de compras
+        # Carrito
         cart_frame = ctk.CTkFrame(compra_frame)
-        cart_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        cart_frame.pack(fill="x", padx=20, pady=10)
 
         cart_label = ctk.CTkLabel(
             cart_frame,
@@ -932,7 +982,7 @@ class RestauranteApp(ctk.CTk):
         self.cart_list.heading("precio", text="Precio")
         self.cart_list.pack(fill="x", padx=20, pady=5)
 
-        # Total y botones de acción
+        # Total y botones
         total_frame = ctk.CTkFrame(compra_frame, fg_color="transparent")
         total_frame.pack(fill="x", padx=20, pady=10)
 
@@ -956,15 +1006,8 @@ class RestauranteApp(ctk.CTk):
         )
         generar_btn.pack(side="right", padx=10)
 
-        cancelar_btn = ctk.CTkButton(
-            button_frame,
-            text="Cancelar",
-            width=100,
-            height=40,
-            fg_color="transparent",
-            border_width=1
-        )
-        cancelar_btn.pack(side="right", padx=10)
+        # Cargar menús disponibles
+        self.cargar_menus_disponibles()
 
     def cargar_clientes(self):
         # Obtener clientes desde la base de datos
@@ -1053,8 +1096,7 @@ class RestauranteApp(ctk.CTk):
 
         messagebox.showinfo("Pedido Generado", "El pedido ha sido generado exitosamente.")
         self.limpiar_carrito()
-    
-
+        self.registrar_pedido()
 
 
 
@@ -1154,10 +1196,62 @@ class RestauranteApp(ctk.CTk):
             font=ctk.CTkFont(size=24, weight="bold")
         )
         title.pack(side="left")
+
+        # Frame principal con scrollbar
+        main_scroll_frame = ctk.CTkFrame(self.main_frame)
+        main_scroll_frame.grid(row=1, column=0, padx=20, pady=(0, 20), sticky="nsew")
+        self.main_frame.grid_rowconfigure(1, weight=1)
+        self.main_frame.grid_columnconfigure(0, weight=1)
+
+        # Configuración del contenedor con scrollbar
+        content_frame = ctk.CTkFrame(main_scroll_frame)
+        content_frame.pack(side="left", fill="both", expand=True, padx=(0, 10))
+
+        # Scrollbar
+        scrollbar = ctk.CTkScrollbar(main_scroll_frame, orientation="vertical")
+        scrollbar.pack(side="right", fill="y")
+
+        # Canvas con tema oscuro
+        canvas = tk.Canvas(
+            content_frame,
+            yscrollcommand=scrollbar.set,
+            bg='#2b2b2b',
+            highlightthickness=0,
+            width=950
+        )
+        canvas.pack(side="left", fill="both", expand=True)
+
+        # Configurar scrollbar
+        scrollbar.configure(command=canvas.yview)
+
+        # Frame para contenido
+        pedidos_frame = ctk.CTkFrame(canvas)
+        canvas_window = canvas.create_window(
+            (0, 0),
+            window=pedidos_frame,
+            anchor="nw",
+            width=canvas.winfo_reqwidth()
+        )
+
+        # Eventos de configuración
+        def on_configure(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+            canvas.itemconfig(
+                canvas_window,
+                width=max(event.width, 950)
+            )
+
+        pedidos_frame.bind("<Configure>", on_configure)
+
+        def on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        canvas.bind_all("<MouseWheel>", on_mousewheel)
+
+        # CONTENIDO DEL PANEL DE PEDIDOS
         
         # Filtros de búsqueda
-        filter_frame = ctk.CTkFrame(self.main_frame)
-        filter_frame.grid(row=1, column=0, padx=20, pady=(0, 20), sticky="ew")
+        filter_frame = ctk.CTkFrame(pedidos_frame)
+        filter_frame.pack(fill="x", padx=20, pady=10)
         
         # Cliente
         cliente_frame = ctk.CTkFrame(filter_frame, fg_color="transparent")
@@ -1173,14 +1267,12 @@ class RestauranteApp(ctk.CTk):
         dates_frame = ctk.CTkFrame(filter_frame, fg_color="transparent")
         dates_frame.pack(fill="x", padx=20, pady=10)
         
-        # Fecha inicio
         fecha_inicio_label = ctk.CTkLabel(dates_frame, text="Fecha inicio:")
         fecha_inicio_label.pack(side="left", padx=5)
         
         fecha_inicio_entry = ctk.CTkEntry(dates_frame, width=120)
         fecha_inicio_entry.pack(side="left", padx=5)
         
-        # Fecha fin
         fecha_fin_label = ctk.CTkLabel(dates_frame, text="Fecha fin:")
         fecha_fin_label.pack(side="left", padx=20)
         
@@ -1196,20 +1288,19 @@ class RestauranteApp(ctk.CTk):
         buscar_btn.pack(side="right", padx=20)
         
         # Tabla de pedidos
-        table_frame = ctk.CTkFrame(self.main_frame)
-        table_frame.grid(row=2, column=0, padx=20, pady=(0, 20), sticky="nsew")
-        self.main_frame.grid_rowconfigure(2, weight=1)
+        table_frame = ctk.CTkFrame(pedidos_frame)
+        table_frame.pack(fill="x", padx=20, pady=10)
         
         # Crear tabla con las columnas requeridas
         columns = ("ID", "Cliente", "Descripción", "Fecha de creación", "Total", "Cantidad de menús")
-        pedidos_tree = ttk.Treeview(
+        self.pedidos_tree = ttk.Treeview(
             table_frame,
             columns=columns,
             show="headings",
             height=15
         )
         
-        # Configurar columnas con anchura adecuada
+        # Configurar columnas
         column_widths = {
             "ID": 80,
             "Cliente": 200,
@@ -1220,16 +1311,10 @@ class RestauranteApp(ctk.CTk):
         }
         
         for col in columns:
-            pedidos_tree.heading(col, text=col)
-            pedidos_tree.column(col, width=column_widths[col])
+            self.pedidos_tree.heading(col, text=col)
+            self.pedidos_tree.column(col, width=column_widths[col])
         
-        pedidos_tree.pack(fill="both", expand=True, padx=5, pady=5)
-        self.pedidos_tree = pedidos_tree  # Guardar referencia para uso posterior
-        
-        # Scrollbar
-        scrollbar = ctk.CTkScrollbar(table_frame, command=pedidos_tree.yview)
-        scrollbar.pack(side="right", fill="y")
-        pedidos_tree.configure(yscrollcommand=scrollbar.set)
+        self.pedidos_tree.pack(fill="x", padx=5, pady=5)
         
         # Botón para mostrar detalles
         details_btn = ctk.CTkButton(
@@ -1238,11 +1323,11 @@ class RestauranteApp(ctk.CTk):
             width=200,
             command=self.mostrar_detalles_pedido
         )
-        details_btn.pack(side="top", pady=10)
+        details_btn.pack(pady=10)
         
         # Panel de detalles
-        details_frame = ctk.CTkFrame(self.main_frame)
-        details_frame.grid(row=3, column=0, padx=20, pady=(0, 20), sticky="ew")
+        details_frame = ctk.CTkFrame(pedidos_frame)
+        details_frame.pack(fill="x", padx=20, pady=10)
         
         details_label = ctk.CTkLabel(
             details_frame,
@@ -1252,7 +1337,7 @@ class RestauranteApp(ctk.CTk):
         details_label.pack(pady=10)
         
         # Tabla de detalles
-        details_tree = ttk.Treeview(
+        self.details_tree = ttk.Treeview(
             details_frame,
             columns=("Menu", "Cantidad", "Precio", "Subtotal"),
             show="headings",
@@ -1260,43 +1345,10 @@ class RestauranteApp(ctk.CTk):
         )
         
         for col in ["Menu", "Cantidad", "Precio", "Subtotal"]:
-            details_tree.heading(col, text=col)
-            details_tree.column(col, width=150)
+            self.details_tree.heading(col, text=col)
+            self.details_tree.column(col, width=150)
         
-        details_tree.pack(fill="x", padx=5, pady=5)
-        self.details_tree = details_tree  # Guardar referencia para uso posterior
-
-    # Método para mostrar detalles del pedido seleccionado
-    def mostrar_detalles_pedido(self):
-        seleccion = self.pedidos_tree.focus()
-        if not seleccion:
-            messagebox.showerror("Error", "Seleccione un pedido para mostrar los detalles.")
-            return
-        
-        pedido = self.pedidos_tree.item(seleccion, "values")
-        pedido_id = pedido[0]  # Obtener el ID del pedido seleccionado
-        
-        # Simulación: Recuperar detalles del pedido desde la base de datos o estructura de datos
-        detalles = [
-            ("Menu 1", 2, "$10.00", "$20.00"),
-            ("Menu 2", 1, "$15.00", "$15.00")
-        ]  # Reemplazar con datos reales
-        
-        # Limpiar tabla de detalles y agregar nuevos datos
-        for item in self.details_tree.get_children():
-            self.details_tree.delete(item)
-        
-        for detalle in detalles:
-            self.details_tree.insert("", "end", values=detalle)
-
-
-
-
-
-
-
-
-
+        self.details_tree.pack(fill="x", padx=5, pady=5)
 
     def mostrar_panel_graficos(self):
         self.limpiar_panel()
@@ -1323,33 +1375,383 @@ class RestauranteApp(ctk.CTk):
         graph_label = ctk.CTkLabel(graph_type_frame, text="Tipo de Gráfico:")
         graph_label.pack(side="left", padx=5)
         
-        graph_types = ["Ventas Diarias", "Ventas Semanales", "Ventas Mensuales", "Ventas Anuales", 
-                    "Menús más Vendidos", "Ingredientes más Utilizados"]
-        graph_combo = ttk.Combobox(graph_type_frame, values=graph_types, width=40)
-        graph_combo.set("Seleccione un tipo de gráfico")
-        graph_combo.pack(side="left", padx=5)
+        # Tipos de gráficos solicitados
+        graph_types = [
+            "Ventas Diarias",
+            "Ventas Semanales", 
+            "Ventas Mensuales",
+            "Ventas Anuales",
+            "Menús más Vendidos",
+            "Ingredientes más Utilizados"
+        ]
         
-        # Período
+        self.graph_combo = ttk.Combobox(graph_type_frame, values=graph_types, width=40)
+        self.graph_combo.set("Seleccione un tipo de gráfico")
+        self.graph_combo.pack(side="left", padx=5)
+        
+        # Período de tiempo
         period_frame = ctk.CTkFrame(selection_frame, fg_color="transparent")
         period_frame.pack(fill="x", padx=20, pady=10)
         
-        # Fecha inicio
         fecha_inicio_label = ctk.CTkLabel(period_frame, text="Desde:")
         fecha_inicio_label.pack(side="left", padx=5)
         
-        fecha_inicio_entry = ctk.CTkEntry(period_frame, width=120)
-        fecha_inicio_entry.pack(side="left", padx=5)
+        self.fecha_inicio_entry = ctk.CTkEntry(period_frame, width=120)
+        self.fecha_inicio_entry.pack(side="left", padx=5)
         
-        # Fecha fin
         fecha_fin_label = ctk.CTkLabel(period_frame, text="Hasta:")
         fecha_fin_label.pack(side="left", padx=20)
         
-        fecha_fin_entry = ctk.CTkEntry(period_frame, width=120)
-        fecha_fin_entry.pack(side="left", padx=5)
+        self.fecha_fin_entry = ctk.CTkEntry(period_frame, width=120)
+        self.fecha_fin_entry.pack(side="left", padx=5)
         
         # Botón generar
         generar_btn = ctk.CTkButton(
             period_frame,
+            text="Generar Gráfico",
+            width=120,
+            command=self.generar_grafico
+        )
+        generar_btn.pack(side="right", padx=20)
+        
+        # Marco para el gráfico
+        self.graph_frame = ctk.CTkFrame(self.main_frame)
+        self.graph_frame.grid(row=2, column=0, padx=20, pady=(0,20), sticky="nsew")
+        self.main_frame.grid_rowconfigure(2, weight=1)
+        
+        # Placeholder para el gráfico
+        graph_placeholder = ctk.CTkLabel(
+            self.graph_frame,
+            text="El gráfico se mostrará aquí",
+            font=ctk.CTkFont(size=16)
+        )
+        graph_placeholder.pack(expand=True)
+        
+        # Panel de estadísticas
+        stats_frame = ctk.CTkFrame(self.main_frame)
+        stats_frame.grid(row=3, column=0, padx=20, pady=(0,20), sticky="ew")
+        
+        # Título de estadísticas
+        stats_label = ctk.CTkLabel(
+            stats_frame,
+            text="Estadísticas",
+            font=ctk.CTkFont(size=16)
+        )
+        stats_label.pack()
+
+    def limpiar_panel(self):
+        for widget in self.main_frame.winfo_children():
+            widget.destroy()
+
+    def registrar_pedido(self):
+        if not self.cliente_combo.get():
+            messagebox.showerror("Error", "Debe seleccionar un cliente")
+            return
+            
+        if not self.cart_list.get_children():
+            messagebox.showerror("Error", "El carrito está vacío")
+            return
+            
+        # Obtener detalles del pedido
+        cliente = self.cliente_combo.get()
+        items = []
+        total = 0
+        cantidad_total = 0
+        
+        for item in self.cart_list.get_children():
+            menu, cantidad, precio = self.cart_list.item(item)["values"]
+            precio = float(precio.replace("$", ""))
+            items.append({
+                "menu": menu,
+                "cantidad": cantidad,
+                "precio": precio
+            })
+            total += precio
+            cantidad_total += cantidad
+        
+        descripcion = f"Pedido de {len(items)} items"
+        
+        # Crear pedido en la base de datos
+        pedido_id = pedido_crud.crear_pedido(
+            cliente=cliente,
+            descripcion=descripcion,
+            total=total,
+            cantidad=cantidad_total,
+            items=items
+        )
+        
+        # Generar boleta
+        self.generar_boleta_pdf(pedido_id)
+        
+        messagebox.showinfo("Éxito", "Pedido registrado correctamente")
+        self.limpiar_carrito()
+        self.actualizar_lista_pedidos()
+
+    def filtrar_pedidos(self):
+        cliente = self.cliente_filtro.get()
+        if not cliente:
+            self.actualizar_lista_pedidos()
+            return
+            
+        pedidos = pedido_crud.buscar_por_cliente(cliente)
+        self.actualizar_lista_pedidos(pedidos)
+
+    def actualizar_pedido(self):
+        seleccion = self.pedidos_tree.selection()
+        if not seleccion:
+            messagebox.showerror("Error", "Seleccione un pedido para actualizar")
+            return
+            
+        pedido_id = self.pedidos_tree.item(seleccion)["values"][0]
+        
+        # Ventana para actualizar cantidad
+        update_window = ctk.CTkToplevel()
+        update_window.title("Actualizar Pedido")
+        update_window.geometry("300x150")
+        
+        cantidad_label = ctk.CTkLabel(update_window, text="Nueva cantidad:")
+        cantidad_label.pack(pady=10)
+        
+        cantidad_entry = ctk.CTkEntry(update_window)
+        cantidad_entry.pack(pady=5)
+        
+        def confirmar_actualizacion():
+            try:
+                nueva_cantidad = int(cantidad_entry.get())
+                if nueva_cantidad <= 0:
+                    raise ValueError()
+            except ValueError:
+                messagebox.showerror("Error", "Ingrese una cantidad válida")
+                return
+                
+            pedido_crud.actualizar_cantidad(pedido_id, nueva_cantidad)
+            self.actualizar_lista_pedidos()
+            update_window.destroy()
+        
+        confirmar_btn = ctk.CTkButton(
+            update_window,
+            text="Actualizar",
+            command=confirmar_actualizacion
+        )
+        confirmar_btn.pack(pady=20)
+
+    def eliminar_pedido(self):
+        seleccion = self.pedidos_tree.selection()
+        if not seleccion:
+            messagebox.showerror("Error", "Seleccione un pedido para eliminar")
+            return
+            
+        if messagebox.askyesno("Confirmar", "¿Está seguro de eliminar el pedido?"):
+            pedido_id = self.pedidos_tree.item(seleccion)["values"][0]
+            pedido_crud.eliminar_pedido(pedido_id)
+            self.actualizar_lista_pedidos()
+
+    def actualizar_lista_pedidos(self, pedidos=None):
+        # Limpiar tabla
+        for item in self.pedidos_tree.get_children():
+            self.pedidos_tree.delete(item)
+            
+        # Obtener pedidos si no se proporcionaron
+        if pedidos is None:
+            pedidos = pedido_crud.obtener_todos()
+            
+        # Insertar pedidos en la tabla
+        for pedido in pedidos:
+            self.pedidos_tree.insert("", "end", values=(
+                pedido.id,
+                pedido.cliente,
+                pedido.descripcion,
+                pedido.fecha_creacion,
+                f"${pedido.total:.2f}",
+                pedido.cantidad
+            ))
+
+    def generar_grafico(self):
+        tipo_grafico = self.graph_combo.get()
+        
+        # Limpiar gráfico anterior si existe
+        if hasattr(self, 'canvas_grafico'):
+            self.canvas_grafico.get_tk_widget().destroy()
+        
+        # Crear nueva figura
+        fig, ax = plt.subplots(figsize=(10, 6))
+        
+        if tipo_grafico == "Ventas Diarias":
+            # Obtener datos de ventas diarias
+            fechas = []
+            ventas = []
+            for i in range(7):  # Últimos 7 días
+                fecha = datetime.now() - timedelta(days=i)
+                total = pedido_crud.obtener_ventas_por_fecha(fecha)
+                fechas.append(fecha.strftime('%d/%m'))
+                ventas.append(total)
+            
+            ax.bar(fechas, ventas)
+            ax.set_title('Ventas Diarias')
+            
+        elif tipo_grafico == "Ventas Mensuales":
+            # Datos de ejemplo para ventas mensuales
+            meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun']
+            ventas = pedido_crud.obtener_ventas_mensuales()
+            ax.plot(meses, ventas, marker='o')
+            ax.set_title('Ventas Mensuales')
+            
+        elif tipo_grafico == "Menús más Vendidos":
+            # Obtener datos de menús más vendidos
+            menus = menu_crud.obtener_mas_vendidos()
+            nombres = [menu['nombre'] for menu in menus]
+            cantidades = [menu['cantidad'] for menu in menus]
+            
+            ax.pie(cantidades, labels=nombres, autopct='%1.1f%%')
+            ax.set_title('Menús más Vendidos')
+            
+        elif tipo_grafico == "Ingredientes más Utilizados":
+            # Obtener ingredientes más utilizados
+            ingredientes = ingrediente_crud.obtener_mas_utilizados()
+            nombres = [ing['nombre'] for ing in ingredientes]
+            cantidades = [ing['cantidad'] for ing in ingredientes]
+            
+            ax.barh(nombres, cantidades)
+            ax.set_title('Ingredientes más Utilizados')
+
+        # Configurar estilo
+        plt.style.use('dark_background')
+        fig.patch.set_facecolor('#2b2b2b')
+        ax.set_facecolor('#2b2b2b')
+        
+        # Crear widget de canvas
+        self.canvas_grafico = FigureCanvasTkAgg(fig, master=self.graph_frame)
+        self.canvas_grafico.draw()
+        self.canvas_grafico.get_tk_widget().pack(fill='both', expand=True)
+        
+        # Actualizar estadísticas
+        self.actualizar_estadisticas()
+
+    def actualizar_estadisticas(self):
+        # Obtener estadísticas
+        stats = pedido_crud.obtener_estadisticas()
+        
+        # Actualizar labels de estadísticas
+        self.total_ventas_label.configure(text=f"${stats['total_ventas']:.2f}")
+        self.promedio_label.configure(text=f"${stats['promedio_diario']:.2f}")
+        self.mejor_dia_label.configure(text=stats['mejor_dia'])
+        self.peor_dia_label.configure(text=stats['peor_dia'])
+
+    def generar_boleta_pdf(self, pedido_id):
+        """Genera una boleta en PDF para un pedido específico"""
+        
+        # Obtener información del pedido
+        pedido = pedido_crud.obtener_pedido(pedido_id)
+        if not pedido:
+            messagebox.showerror("Error", "Pedido no encontrado")
+            return
+
+        # Crear PDF
+        pdf = FPDF()
+        pdf.add_page()
+        
+        # Configurar fuente
+        pdf.set_font("Arial", size=12)
+        
+        # Encabezado
+        pdf.cell(200, 10, txt="RESTAURANTE GESTIÓN", ln=True, align="C")
+        pdf.set_font("Arial", size=10)
+        pdf.cell(200, 10, txt=f"Fecha: {datetime.now().strftime('%d/%m/%Y %H:%M')}", ln=True, align="R")
+        pdf.cell(200, 10, txt=f"Boleta N°: {pedido_id}", ln=True, align="R")
+        
+        # Datos del cliente
+        pdf.ln(10)
+        pdf.cell(200, 10, txt=f"Cliente: {pedido.cliente}", ln=True)
+        
+        # Tabla de items
+        pdf.ln(10)
+        # Encabezados
+        pdf.set_fill_color(200, 200, 200)
+        pdf.cell(80, 10, txt="Menú", border=1, fill=True)
+        pdf.cell(30, 10, txt="Cantidad", border=1, fill=True)
+        pdf.cell(40, 10, txt="Precio Unit.", border=1, fill=True)
+        pdf.cell(40, 10, txt="Subtotal", border=1, fill=True, ln=True)
+        
+        # Detalles de items
+        total = 0
+        for item in pedido.items:
+            pdf.cell(80, 10, txt=item.menu, border=1)
+            pdf.cell(30, 10, txt=str(item.cantidad), border=1)
+            pdf.cell(40, 10, txt=f"${item.precio:.2f}", border=1)
+            subtotal = item.cantidad * item.precio
+            pdf.cell(40, 10, txt=f"${subtotal:.2f}", border=1, ln=True)
+            total += subtotal
+        
+        # Total
+        pdf.ln(10)
+        pdf.set_font("Arial", "B", 12)
+        pdf.cell(150, 10, txt="Total:", align="R")
+        pdf.cell(40, 10, txt=f"${total:.2f}", ln=True)
+        
+        # Pie de página
+        pdf.ln(20)
+        pdf.set_font("Arial", size=8)
+        pdf.cell(200, 10, txt="Gracias por su compra", align="C")
+        
+        # Guardar PDF
+        fecha = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"boleta_{pedido_id}_{fecha}.pdf"
+        pdf.output(filename)
+        
+        messagebox.showinfo("Éxito", f"Boleta generada: {filename}")
+
+if __name__ == "__main__":
+    app = RestauranteApp()
+    app.mainloop()
+
+import tkinter as tk
+from tkinter import ttk
+
+class App:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Aplicación con Scrollbar")
+
+        # Crear un frame para el menú y la scrollbar
+        menu_frame = ttk.Frame(self.root)
+        menu_frame.pack(fill=tk.BOTH, expand=True)
+
+        # Crear el Treeview para los detalles
+        self.details_tree = ttk.Treeview(menu_frame)
+        self.details_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        # Crear la scrollbar
+        scrollbar = ttk.Scrollbar(menu_frame, orient="vertical", command=self.details_tree.yview)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Configurar el Treeview para usar la scrollbar
+        self.details_tree.configure(yscrollcommand=scrollbar.set)
+
+        # Datos de ejemplo
+        detalles = [
+            ("Item 1", "Descripción 1"),
+            ("Item 2", "Descripción 2"),
+            ("Item 3", "Descripción 3"),
+            # Agrega más datos aquí
+        ]
+
+        # Limpiar tabla de detalles y agregar nuevos datos
+        for item in self.details_tree.get_children():
+            self.details_tree.delete(item)
+        
+        for detalle in detalles:
+            self.details_tree.insert("", "end", values=detalle)
+
+    def mostrar_panel_graficos(self):
+        self.limpiar_panel()
+        
+        # Header
+        header_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        header_frame.grid(row=0, column=0, padx=20, pady=(20,10), sticky="ew")
+
+        # Botón para generar gráfico
+        generar_btn = ctk.CTkButton(
+            header_frame,
             text="Generar Gráfico",
             width=120
         )
@@ -1375,38 +1777,12 @@ class RestauranteApp(ctk.CTk):
         # Título de estadísticas
         stats_label = ctk.CTkLabel(
             stats_frame,
-            text="Resumen Estadístico",
-            font=ctk.CTkFont(size=16, weight="bold")
+            text="Estadísticas",
+            font=ctk.CTkFont(size=16)
         )
-        stats_label.pack(pady=10)
-        
-        # Grid para estadísticas
-        stats_grid = ctk.CTkFrame(stats_frame, fg_color="transparent")
-        stats_grid.pack(fill="x", padx=20, pady=10)
-        
-        # Estadísticas de ejemplo
-        stats = [
-            ("Total Ventas:", "$0"),
-            ("Promedio Diario:", "$0"),
-            ("Mejor Día:", "N/A"),
-            ("Peor Día:", "N/A")
-        ]
-        
-        for i, (label_text, value) in enumerate(stats):
-            container = ctk.CTkFrame(stats_grid, fg_color="transparent")
-            container.grid(row=i//2, column=i%2, padx=10, pady=5, sticky="w")
-            
-            label = ctk.CTkLabel(container, text=label_text, font=ctk.CTkFont(weight="bold"))
-            label.pack(side="left", padx=5)
-            
-            value_label = ctk.CTkLabel(container, text=value)
-            value_label.pack(side="left", padx=5)
-
-
-    def limpiar_panel(self):
-        for widget in self.main_frame.winfo_children():
-            widget.destroy()
+        stats_label.pack()
 
 if __name__ == "__main__":
-    app = RestauranteApp()
-    app.mainloop()
+    root = tk.Tk()
+    app = App(root)
+    root.mainloop()
