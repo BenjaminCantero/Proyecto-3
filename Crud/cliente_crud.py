@@ -1,4 +1,3 @@
-# CRUD de Clientes
 from models import Cliente
 class ClienteCRUD:
     def __init__(self, session):

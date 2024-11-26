@@ -1,5 +1,3 @@
-# Crud de los menus
-
 from models import Menu
 class MenuCRUD:
     def __init__(self, session):
