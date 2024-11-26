@@ -564,6 +564,18 @@ class RestauranteApp(ctk.CTk):
         for ingrediente in ingredientes:
             self.available_list.insert("", "end", values=(ingrediente.nombre, ingrediente.cantidad))
 
+    def cargar_menus_disponibles(self):
+        # Obtener menús disponibles desde la base de datos
+        menus = menu_crud.leer_menus()
+
+        # Limpiar la lista
+        for item in self.menus_list.get_children():
+            self.menus_list.delete(item)
+
+        # Agregar menús a la lista
+        for menu in menus:
+            self.menus_list.insert("", "end", values=(menu.nombre, menu.descripcion, menu.precio))
+
     def agregar_ingrediente(self):
         # Obtener el ingrediente seleccionado de la lista de ingredientes disponibles
         seleccion = self.available_list.focus()
@@ -656,6 +668,7 @@ class RestauranteApp(ctk.CTk):
 
         # Obtener el ID del menú seleccionado
         menu_id = self.menus_list.item(seleccion, "values")[0]  # Asegúrate de que el ID esté en la primera posición
+        print(f"ID del menú a eliminar: {menu_id}")  # Imprime el ID para depuración
 
         # Confirmar la eliminación
         confirmacion = messagebox.askyesno("Confirmar Eliminación", "¿Está seguro de que desea eliminar este menú?")
@@ -670,7 +683,6 @@ class RestauranteApp(ctk.CTk):
             messagebox.showinfo("Menú Eliminado", "El menú ha sido eliminado exitosamente.")
         else:
             messagebox.showerror("Error", "No se pudo eliminar el menú. Verifique que exista en la base de datos.")
-
 
 
     def mostrar_panel_clientes(self):
@@ -894,7 +906,7 @@ class RestauranteApp(ctk.CTk):
         self.menus_list.pack(fill="x", padx=20, pady=5)
 
         # Cargar menús disponibles
-        self.cargar_menus_disponibles()
+        self.cargar_menus_disponibles_compra()
 
         # Campo para cantidad
         cantidad_frame = ctk.CTkFrame(menus_frame, fg_color="transparent")
@@ -971,7 +983,7 @@ class RestauranteApp(ctk.CTk):
         clientes = cliente_crud.leer_clientes()
         self.cliente_combo['values'] = [cliente.nombre for cliente in clientes]
 
-    def cargar_menus_disponibles(self):
+    def cargar_menus_disponibles_compra(self):
         # Obtener menús disponibles desde la base de datos
         menus = menu_crud.leer_menus()
         for menu in menus:
