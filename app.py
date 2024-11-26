@@ -1024,10 +1024,19 @@ class RestauranteApp(ctk.CTk):
         self.cliente_combo['values'] = [cliente.nombre for cliente in clientes]
 
     def cargar_menus_disponibles(self):
-        # Obtener menús disponibles desde la base de datos
-        menus = menu_crud.leer_menus()
-        for menu in menus:
-            self.menus_list.insert("", "end", values=(menu.nombre, menu.precio))
+        """
+        Carga los menús disponibles desde la base de datos y los muestra en la lista de menús.
+        """
+        self.menus_list.delete(*self.menus_list.get_children())  # Limpiar cualquier dato previo
+        try:
+            menus = menu_crud.leer_menus()  # Recuperar los menús desde la base de datos
+            if not menus:
+                messagebox.showwarning("Menús", "No hay menús disponibles en este momento.")
+                return
+            for menu in menus:
+                self.menus_list.insert("", "end", values=(menu.nombre, f"{menu.precio:.2f}"))
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudieron cargar los menús: {str(e)}")
 
     def agregar_al_carrito(self, menus_list, cantidad_entry):
         # Intentar convertir la entrada de cantidad a un entero
@@ -1153,50 +1162,60 @@ class RestauranteApp(ctk.CTk):
 
     def generar_pedido_pdf(self):
         """
-        Genera una boleta PDF en tiempo real con los datos del carrito y la actualiza
-        cada vez que se llama al método.
+        Genera un archivo PDF con la boleta del pedido actual.
         """
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font("Arial", size=12)
+        if not self.cart_list.get_children():
+            messagebox.showwarning("Carrito Vacío", "No hay elementos en el carrito para generar la boleta.")
+            return
 
-        # Encabezado
-        pdf.cell(200, 10, txt="Pedido de Compra", ln=True, align="C")
-        pdf.ln(10)
+        try:
+            # Crear el PDF
+            pdf = FPDF()
+            pdf.add_page()
+            pdf.set_font("Arial", size=12)
 
-        # Tabla de encabezados
-        pdf.set_fill_color(200, 200, 200)  # Color de fondo para encabezados
-        pdf.cell(80, 10, txt="Nombre", border=1, fill=True, align="C")
-        pdf.cell(40, 10, txt="Cantidad", border=1, fill=True, align="C")
-        pdf.cell(40, 10, txt="Precio", border=1, fill=True, align="C")
-        pdf.ln()
+            # Encabezado
+            pdf.set_font("Arial", style="B", size=16)
+            pdf.cell(200, 10, txt="Boleta de Compra", ln=True, align="C")
+            pdf.ln(10)
 
-        # Filas de datos
-        for item in self.cart_list.get_children():
-            nombre, cantidad, precio = self.cart_list.item(item, "values")
-            pdf.cell(80, 10, txt=nombre, border=1)
-            pdf.cell(40, 10, txt=str(cantidad), border=1, align="C")
-            pdf.cell(40, 10, txt=f"${precio}", border=1, align="R")
+            # Tabla de encabezados
+            pdf.set_font("Arial", size=12)
+            pdf.set_fill_color(200, 200, 200)  # Fondo para encabezados
+            pdf.cell(80, 10, txt="Nombre", border=1, fill=True, align="C")
+            pdf.cell(40, 10, txt="Cantidad", border=1, fill=True, align="C")
+            pdf.cell(40, 10, txt="Precio", border=1, fill=True, align="C")
             pdf.ln()
 
-        # Total
-        pdf.ln(10)
-        total = self.total_label.cget("text")
-        pdf.cell(0, 10, txt=f"Total: {total}", align="R")
+            # Agregar los datos del carrito al PDF
+            total = 0
+            for item in self.cart_list.get_children():
+                nombre, cantidad, precio = self.cart_list.item(item, "values")
+                total += float(precio[1:])  # Sumar el precio sin el símbolo $
+                pdf.cell(80, 10, txt=nombre, border=1)
+                pdf.cell(40, 10, txt=str(cantidad), border=1, align="C")
+                pdf.cell(40, 10, txt=precio, border=1, align="R")
+                pdf.ln()
 
-        # Guardar el archivo
-        pdf_file = "pedido_actualizado.pdf"
-        pdf.output(pdf_file)
+            # Total
+            pdf.ln(10)
+            pdf.set_font("Arial", style="B", size=12)
+            pdf.cell(0, 10, txt=f"Total: {self.total_label.cget('text')}", align="R")
 
-        # Mostrar mensaje y abrir automáticamente el PDF si existe
-        if os.path.exists(pdf_file):
-            messagebox.showinfo("Pedido Generado", f"Pedido guardado como {pdf_file}")
-            os.system(f"start {pdf_file}")
-        else:
-            messagebox.showerror("Error", "No se pudo guardar el PDF.")
+            # Guardar el archivo
+            pdf_file = "boleta_pedido.pdf"
+            pdf.output(pdf_file)
 
+            # Verificar y abrir el archivo
+            if os.path.exists(pdf_file):
+                messagebox.showinfo("Pedido Generado", f"Pedido guardado como {pdf_file}")
+                os.system(f"start {pdf_file}")
+            else:
+                messagebox.showerror("Error", "No se pudo guardar el PDF.")
+        except Exception as e:
+            messagebox.showerror("Error", f"Ocurrió un problema al generar la boleta: {str(e)}")
 
-        # Limpiar el carrito tras generar el PDF
+            # Limpiar el carrito tras generar el PDF
         self.limpiar_carrito()
 
         
@@ -1375,139 +1394,151 @@ class RestauranteApp(ctk.CTk):
         self.details_tree.pack(fill="x", padx=5, pady=5)
 
     def registrar_pedido(self):
-            # Verificar si se seleccionó un cliente
-            cliente = self.cliente_combo.get()
-            if not cliente:
-                messagebox.showerror("Error", "Debe seleccionar un cliente")
-                return
+        # Verificar si se seleccionó un cliente
+        cliente = self.cliente_combo.get()
+        if not cliente:
+            messagebox.showerror("Error", "Debe seleccionar un cliente")
+            return
 
-            # Verificar si el carrito tiene elementos
-            if not self.cart_list.get_children():
-                messagebox.showerror("Error", "El carrito está vacío")
-                return
+        # Verificar si el carrito tiene elementos
+        if not self.cart_list.get_children():
+            messagebox.showerror("Error", "El carrito está vacío")
+            return
 
-            # Inicializar detalles del pedido
-            items = []
-            total = 0
-            cantidad_total = 0
+        # Inicializar detalles del pedido
+        items = []
+        total = 0
+        cantidad_total = 0
 
-            try:
-                # Procesar los elementos del carrito
-                for item in self.cart_list.get_children():
-                    menu, cantidad, precio = self.cart_list.item(item)["values"]
-                    precio = float(precio.replace("$", "").strip())
-                    cantidad = int(cantidad)
+        try:
+            # Procesar los elementos del carrito
+            for item in self.cart_list.get_children():
+                menu, cantidad, precio = self.cart_list.item(item)["values"]
+                precio = float(precio.replace("$", "").strip())
+                cantidad = int(cantidad)
 
-                    items.append({
-                        "menu": menu,
-                        "cantidad": cantidad,
-                        "precio": precio
-                    })
-                    total += precio * cantidad
-                    cantidad_total += cantidad
-            except ValueError:
-                messagebox.showerror("Error", "Datos inválidos en el carrito")
-                return
+                items.append({
+                    "menu": menu,
+                    "cantidad": cantidad,
+                    "precio": precio
+                })
+                total += precio * cantidad
+                cantidad_total += cantidad
+        except ValueError:
+            messagebox.showerror("Error", "Datos inválidos en el carrito")
+            return
 
-            descripcion = f"Pedido de {len(items)} items"
+        # Crear descripción del pedido
+        descripcion = f"Pedido de {len(items)} ítems"
 
-            try:
-                # Crear pedido en la base de datos
-                pedido_id = pedido_crud.crear_pedido(
-                    cliente=cliente,
-                    descripcion=descripcion,
-                    total=total,
-                    cantidad=cantidad_total,
-                    items=items
-                )
+        try:
+            # Llamar al CRUD para crear el pedido
+            pedido_id = self.pedido_crud.crear_pedido(
+                cliente=cliente,
+                descripcion=descripcion,
+                total=total,
+                cantidad=cantidad_total,
+                items=items
+            )
 
-                # Generar boleta PDF
-                self.generar_boleta_pdf(pedido_id)
+            # Generar boleta en formato PDF (asumiendo que la función ya está implementada)
+            self.generar_boleta_pdf(pedido_id)
 
-                # Notificar éxito
-                messagebox.showinfo("Éxito", "Pedido registrado correctamente")
-                self.limpiar_carrito()
-                self.actualizar_lista_pedidos()
-            except RuntimeError as e:
-                messagebox.showerror("Error", f"No se pudo registrar el pedido: {str(e)}")
+            # Notificar éxito al usuario
+            messagebox.showinfo("Éxito", "Pedido registrado correctamente")
+
+            # Limpiar el carrito y actualizar la lista de pedidos
+            self.limpiar_carrito()
+            self.actualizar_lista_pedidos()
+
+        except RuntimeError as e:
+            messagebox.showerror("Error", f"No se pudo registrar el pedido: {str(e)}")
 
     def mostrar_detalles_pedido(self):
+        # Verificar si hay una selección en la tabla de pedidos
         seleccion = self.pedidos_tree.selection()
         if not seleccion:
             messagebox.showerror("Error", "Seleccione un pedido para ver los detalles")
             return
 
+        # Obtener el ID del pedido seleccionado
         pedido_id = self.pedidos_tree.item(seleccion)["values"][0]
         try:
-            detalles = pedido_crud.obtener_detalles(pedido_id)  # Implementar esta función en el CRUD
+            # Llamar al CRUD para obtener los detalles del pedido
+            detalles = self.pedido_crud.obtener_detalles(pedido_id)
+
+            # Limpiar la tabla de detalles
             self.details_tree.delete(*self.details_tree.get_children())
+
+            # Insertar los detalles en la tabla
             for detalle in detalles:
                 self.details_tree.insert("", "end", values=(
-                    detalle["menu"], detalle["cantidad"], detalle["precio"], detalle["subtotal"]
+                    detalle["menu"], detalle["cantidad"], f"${detalle['precio']:.2f}", f"${detalle['subtotal']:.2f}"
                 ))
+
         except RuntimeError as e:
             messagebox.showerror("Error", f"No se pudieron cargar los detalles: {str(e)}")
 
-
     def filtrar_pedidos(self):
-            cliente = self.cliente_filtro.get()
+        cliente = self.cliente_combo.get()
 
-            try:
-                if not cliente:
-                    # Mostrar todos los pedidos si no hay filtro
-                    self.actualizar_lista_pedidos()
-                else:
-                    # Filtrar por cliente
-                    pedidos = pedido_crud.buscar_por_cliente(cliente)
-                    self.actualizar_lista_pedidos(pedidos)
-            except RuntimeError as e:
-                messagebox.showerror("Error", f"No se pudo filtrar los pedidos: {str(e)}")
+        try:
+            # Si no hay filtro, mostrar todos los pedidos
+            if not cliente:
+                self.actualizar_lista_pedidos()
+            else:
+                # Llamar al CRUD para buscar los pedidos por cliente
+                pedidos = self.pedido_crud.buscar_por_cliente(cliente)
+                self.actualizar_lista_pedidos(pedidos)
+        except RuntimeError as e:
+            messagebox.showerror("Error", f"No se pudo filtrar los pedidos: {str(e)}")
 
     def actualizar_pedido(self):
-            seleccion = self.pedidos_tree.selection()
+        # Verificar si hay una selección en la tabla de pedidos
+        seleccion = self.pedidos_tree.selection()
+        if not seleccion:
+            messagebox.showerror("Error", "Seleccione un pedido para actualizar")
+            return
 
-            if not seleccion:
-                messagebox.showerror("Error", "Seleccione un pedido para actualizar")
-                return
+        # Obtener el ID del pedido seleccionado
+        pedido_id = self.pedidos_tree.item(seleccion)["values"][0]
 
-            # Obtener ID del pedido seleccionado
-            pedido_id = self.pedidos_tree.item(seleccion)["values"][0]
+        # Crear ventana emergente para actualizar la cantidad
+        update_window = ctk.CTkToplevel()
+        update_window.title("Actualizar Pedido")
+        update_window.geometry("300x150")
 
-            # Crear ventana para actualizar cantidad
-            update_window = ctk.CTkToplevel()
-            update_window.title("Actualizar Pedido")
-            update_window.geometry("300x150")
+        cantidad_label = ctk.CTkLabel(update_window, text="Nueva cantidad:")
+        cantidad_label.pack(pady=10)
 
-            cantidad_label = ctk.CTkLabel(update_window, text="Nueva cantidad:")
-            cantidad_label.pack(pady=10)
+        cantidad_entry = ctk.CTkEntry(update_window)
+        cantidad_entry.pack(pady=5)
 
-            cantidad_entry = ctk.CTkEntry(update_window)
-            cantidad_entry.pack(pady=5)
+        def confirmar_actualizacion():
+            try:
+                nueva_cantidad = int(cantidad_entry.get())
+                if nueva_cantidad <= 0:
+                    raise ValueError("La cantidad debe ser mayor a cero")
 
-            def confirmar_actualizacion():
-                try:
-                    nueva_cantidad = int(cantidad_entry.get())
-                    if nueva_cantidad <= 0:
-                        raise ValueError("La cantidad debe ser mayor a cero")
+                # Llamar al CRUD para actualizar la cantidad del pedido
+                self.pedido_crud.actualizar_cantidad(pedido_id, nueva_cantidad)
+                self.actualizar_lista_pedidos()
 
-                    # Actualizar cantidad en la base de datos
-                    pedido_crud.actualizar_cantidad(pedido_id, nueva_cantidad)
-                    self.actualizar_lista_pedidos()
+                # Notificar éxito al usuario y cerrar la ventana emergente
+                messagebox.showinfo("Éxito", "Pedido actualizado correctamente")
+                update_window.destroy()
 
-                    messagebox.showinfo("Éxito", "Pedido actualizado correctamente")
-                    update_window.destroy()
-                except ValueError as ve:
-                    messagebox.showerror("Error", str(ve))
-                except RuntimeError as e:
-                    messagebox.showerror("Error", f"No se pudo actualizar el pedido: {str(e)}")
+            except ValueError as ve:
+                messagebox.showerror("Error", str(ve))
+            except RuntimeError as e:
+                messagebox.showerror("Error", f"No se pudo actualizar el pedido: {str(e)}")
 
-            confirmar_btn = ctk.CTkButton(
-                update_window,
-                text="Actualizar",
-                command=confirmar_actualizacion
-            )
-            confirmar_btn.pack(pady=20)
-
+        confirmar_btn = ctk.CTkButton(
+            update_window,
+            text="Actualizar",
+            command=confirmar_actualizacion
+        )
+        confirmar_btn.pack(pady=20)
 
 
 
