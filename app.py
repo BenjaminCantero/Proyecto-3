@@ -16,6 +16,7 @@ import numpy as np
 from datetime import datetime, timedelta
 from graficos import Graficos
 from fpdf import FPDF
+import random
 
 # Crear una sesión
 session = Session()
@@ -1640,6 +1641,7 @@ class RestauranteApp(ctk.CTk):
         for widget in self.main_frame.winfo_children():
             widget.destroy()
 
+
     def generar_grafico(self):
         tipo_grafico = self.graph_combo.get()
         fecha_inicio = self.fecha_inicio_entry.get()
@@ -1665,19 +1667,56 @@ class RestauranteApp(ctk.CTk):
         fig, ax = plt.subplots(figsize=(10, 6))
 
         if tipo_grafico == "Ventas Diarias":
-            # Obtener datos de ventas diarias
-            fechas = []
-            ventas = []
-            for i in range(7):  # Últimos 7 días
-                fecha = datetime.datetime.now() - datetime.timedelta(days=i)
-                total = self.pedido_crud.obtener_ventas_por_fecha(fecha)  # Asumiendo que tienes el CRUD correctamente configurado
-                fechas.append(fecha.strftime('%d/%m'))
-                ventas.append(total)
-
+            # Simular ventas diarias (últimos 7 días)
+            fechas = [(datetime.datetime.now() - datetime.timedelta(days=i)).strftime('%d/%m') for i in range(7)]
+            ventas = [random.randint(100, 500) for _ in range(7)]  # Ventas simuladas entre 100 y 500
             ax.bar(fechas, ventas)
             ax.set_title('Ventas Diarias')
+            ax.set_xlabel('Fecha')
+            ax.set_ylabel('Ventas')
 
-        # Agregar más tipos de gráficos según el tipo seleccionado...
+        elif tipo_grafico == "Ventas Semanales":
+            # Simular ventas semanales (últimas 4 semanas)
+            semanas = [f'Semana {i+1}' for i in range(4)]
+            ventas = [random.randint(2000, 10000) for _ in range(4)]  # Ventas simuladas entre 2000 y 10000
+            ax.bar(semanas, ventas)
+            ax.set_title('Ventas Semanales')
+            ax.set_xlabel('Semana')
+            ax.set_ylabel('Ventas')
+
+        elif tipo_grafico == "Ventas Mensuales":
+            # Simular ventas mensuales (últimos 12 meses)
+            meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+            ventas = [random.randint(2000, 10000) for _ in range(12)]  # Ventas simuladas entre 2000 y 10000
+            ax.plot(meses, ventas, marker='o', color='orange')
+            ax.set_title('Ventas Mensuales')
+            ax.set_xlabel('Mes')
+            ax.set_ylabel('Ventas')
+
+        elif tipo_grafico == "Ventas Anuales":
+            # Simular ventas anuales (últimos 5 años)
+            años = [str(datetime.datetime.now().year - i) for i in range(5)]
+            ventas = [random.randint(50000, 200000) for _ in range(5)]  # Ventas simuladas entre 50000 y 200000
+            ax.plot(años, ventas, marker='o', color='green')
+            ax.set_title('Ventas Anuales')
+            ax.set_xlabel('Año')
+            ax.set_ylabel('Ventas')
+
+        elif tipo_grafico == "Menús más Vendidos":
+            # Simular menús más vendidos
+            menus = ['Pizza', 'Hamburguesa', 'Tacos', 'Pasta', 'Ensalada']
+            ventas = [random.randint(50, 200) for _ in menus]
+            ax.pie(ventas, labels=menus, autopct='%1.1f%%', startangle=90)
+            ax.set_title('Menús Más Vendidos')
+
+        elif tipo_grafico == "Ingredientes más Utilizados":
+            # Simular ingredientes más utilizados
+            ingredientes = ['Tomate', 'Lechuga', 'Carne', 'Queso', 'Pollo']
+            usos = [random.randint(100, 500) for _ in ingredientes]
+            ax.bar(ingredientes, usos)
+            ax.set_title('Ingredientes Más Utilizados')
+            ax.set_xlabel('Ingrediente')
+            ax.set_ylabel('Cantidad de Uso')
 
         # Configurar estilo del gráfico
         plt.style.use('dark_background')
@@ -1689,18 +1728,18 @@ class RestauranteApp(ctk.CTk):
         self.canvas_grafico.draw()
         self.canvas_grafico.get_tk_widget().pack(fill='both', expand=True)
 
-    
-
-
     def actualizar_estadisticas(self):
-        # Obtener estadísticas
-        stats = pedido_crud.obtener_estadisticas()
-        
+        # Simular estadísticas
+        total_ventas = random.uniform(5000, 20000)  # Total de ventas entre $5000 y $20000
+        promedio_diario = total_ventas / 30  # Promedio diario, simulando que el mes tiene 30 días
+        mejor_dia = (datetime.datetime.now() - datetime.timedelta(days=random.randint(1, 30))).strftime('%d/%m/%Y')
+        peor_dia = (datetime.datetime.now() - datetime.timedelta(days=random.randint(1, 30))).strftime('%d/%m/%Y')
+
         # Actualizar labels de estadísticas
-        self.total_ventas_label.configure(text=f"${stats['total_ventas']:.2f}")
-        self.promedio_label.configure(text=f"${stats['promedio_diario']:.2f}")
-        self.mejor_dia_label.configure(text=stats['mejor_dia'])
-        self.peor_dia_label.configure(text=stats['peor_dia'])
+        self.total_ventas_label.configure(text=f"${total_ventas:.2f}")
+        self.promedio_label.configure(text=f"${promedio_diario:.2f}")
+        self.mejor_dia_label.configure(text=mejor_dia)
+        self.peor_dia_label.configure(text=peor_dia)
 
 if __name__ == "__main__":
     app = RestauranteApp()
