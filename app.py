@@ -4,6 +4,7 @@ from tkinter import END
 from tkinter import ttk
 from tkinter import messagebox
 import re
+import os
 from database import Session
 from Crud.cliente_crud import ClienteCRUD
 from Crud.ingrediente_crud import IngredienteCRUD 
@@ -13,6 +14,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import numpy as np
 from datetime import datetime, timedelta
+from graficos import Graficos
 from fpdf import FPDF
 
 # Crear una sesión
@@ -71,7 +73,14 @@ class RestauranteApp(ctk.CTk):
         self.main_frame.grid_columnconfigure(0, weight=1)
         self.main_frame.grid_rowconfigure(1, weight=1)
         
+        # Inicializar instancias de CRUD
+        self.pedido_crud = PedidosCRUD(session)
+        self.menu_crud = MenuCRUD(session)
+        self.ingrediente_crud = IngredienteCRUD(session)
+        
         # Mostrar panel inicial
+        self.mostrar_panel_graficos()
+
         self.mostrar_panel_ingredientes()
         
     def mostrar_panel_ingredientes(self):
@@ -1067,49 +1076,38 @@ class RestauranteApp(ctk.CTk):
             messagebox.showerror("Error", "Seleccione un cliente para realizar el pedido.")
             return
 
-        # Aquí puedes agregar la lógica para guardar el pedido en la base de datos
-        # y disminuir la cantidad de ingredientes necesarios.
+        try:
+            # Obtener los ingredientes del carrito
+            for item in self.cart_list.get_children():
+                nombre_menu, cantidad, _ = self.cart_list.item(item, "values")
+                
+                # Obtener los ingredientes del menú
+                ingredientes = menu_crud.obtener_ingredientes_por_menu(nombre_menu)
+                
+                # Validar que ingredientes no sea None
+                if not ingredientes:
+                    messagebox.showwarning(
+                        "Advertencia",
+                        f"No se encontraron ingredientes para el menú '{nombre_menu}'."
+                    )
+                    continue
 
-        messagebox.showinfo("Pedido Generado", "El pedido ha sido generado exitosamente.")
-        self.limpiar_carrito()
+                # Disminuir la cantidad de cada ingrediente
+                for ingrediente in ingredientes:
+                    ingrediente_crud.disminuir_ingrediente(
+                        ingrediente["nombre"], 
+                        ingrediente["cantidad"] * int(cantidad)
+                    )
 
-    def limpiar_carrito(self):
-        self.cart_list.delete(*self.cart_list.get_children())
-        self.total_label.configure(text="Total: $0.00")
-        self.cantidad_entry.delete(0, "end")
+            messagebox.showinfo("Pedido Generado", "El pedido ha sido generado exitosamente.")
+            self.limpiar_carrito()
+            self.registrar_pedido()
 
-    def generar_pedido(self):
-        cliente_seleccionado = self.cliente_combo.get()
-        if not cliente_seleccionado:
-            messagebox.showerror("Error", "Seleccione un cliente para realizar el pedido.")
-            return
-
-        # Obtener los ingredientes del carrito
-        for item in self.cart_list.get_children():
-            nombre_menu, cantidad, _ = self.cart_list.item(item, "values")
-            # Obtener los ingredientes del menú
-            ingredientes = menu_crud.obtener_ingredientes_por_menu(nombre_menu)
-            
-            for ingrediente in ingredientes:
-                # Disminuir la cantidad del ingrediente
-                ingrediente_crud.disminuir_ingrediente(ingrediente.nombre, ingrediente.cantidad * cantidad)
-
-        messagebox.showinfo("Pedido Generado", "El pedido ha sido generado exitosamente.")
-        self.limpiar_carrito()
-        self.registrar_pedido()
-
+        except Exception as e:
+            messagebox.showerror("Error", f"Ocurrió un error al generar el pedido: {str(e)}")
 
 
 
-
-
-
-
-
-
-
-
-    # Métodos adicionales
     def agregar_al_carrito(self, menus_list, cantidad_entry):
         # Intentar convertir la entrada de cantidad a un entero
         try:
@@ -1146,38 +1144,64 @@ class RestauranteApp(ctk.CTk):
             total += float(self.cart_list.item(item, "values")[2][1:])  # Extraer el valor sin el símbolo '$'
         self.total_label.configure(text=f"Total: ${total:.2f}")
 
-    def generar_pedido_pdf(self):
-        from fpdf import FPDF
+    def limpiar_carrito(self):
+        """
+        Limpia todos los elementos del carrito y restablece el total.
+        """
+        self.cart_list.delete(*self.cart_list.get_children())  # Eliminar todos los elementos del carrito
+        self.total_label.configure(text="Total: $0.00")        # Restablecer el total a $0.00
 
+    def generar_pedido_pdf(self):
+        """
+        Genera una boleta PDF en tiempo real con los datos del carrito y la actualiza
+        cada vez que se llama al método.
+        """
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Arial", size=12)
 
+        # Encabezado
         pdf.cell(200, 10, txt="Pedido de Compra", ln=True, align="C")
         pdf.ln(10)
 
-        pdf.cell(50, 10, txt="Nombre", border=1)
-        pdf.cell(30, 10, txt="Cantidad", border=1)
-        pdf.cell(30, 10, txt="Precio", border=1)
+        # Tabla de encabezados
+        pdf.set_fill_color(200, 200, 200)  # Color de fondo para encabezados
+        pdf.cell(80, 10, txt="Nombre", border=1, fill=True, align="C")
+        pdf.cell(40, 10, txt="Cantidad", border=1, fill=True, align="C")
+        pdf.cell(40, 10, txt="Precio", border=1, fill=True, align="C")
         pdf.ln()
 
+        # Filas de datos
         for item in self.cart_list.get_children():
             nombre, cantidad, precio = self.cart_list.item(item, "values")
-            pdf.cell(50, 10, txt=nombre, border=1)
-            pdf.cell(30, 10, txt=str(cantidad), border=1)
-            pdf.cell(30, 10, txt=precio, border=1)
+            pdf.cell(80, 10, txt=nombre, border=1)
+            pdf.cell(40, 10, txt=str(cantidad), border=1, align="C")
+            pdf.cell(40, 10, txt=f"${precio}", border=1, align="R")
             pdf.ln()
 
+        # Total
         pdf.ln(10)
-        pdf.cell(50, 10, txt=self.total_label.cget("text"), align="R")
+        total = self.total_label.cget("text")
+        pdf.cell(0, 10, txt=f"Total: {total}", align="R")
 
-        pdf_file = "pedido.pdf"
+        # Guardar el archivo
+        pdf_file = "pedido_actualizado.pdf"
         pdf.output(pdf_file)
-        messagebox.showinfo("Pedido Generado", f"Pedido guardado como {pdf_file}")
 
-    
-    
-    
+        # Mostrar mensaje y abrir automáticamente el PDF si existe
+        if os.path.exists(pdf_file):
+            messagebox.showinfo("Pedido Generado", f"Pedido guardado como {pdf_file}")
+            os.system(f"start {pdf_file}")
+        else:
+            messagebox.showerror("Error", "No se pudo guardar el PDF.")
+
+
+        # Limpiar el carrito tras generar el PDF
+        self.limpiar_carrito()
+
+        
+        
+        
     
     
     
@@ -1350,6 +1374,147 @@ class RestauranteApp(ctk.CTk):
         
         self.details_tree.pack(fill="x", padx=5, pady=5)
 
+    def registrar_pedido(self):
+            # Verificar si se seleccionó un cliente
+            cliente = self.cliente_combo.get()
+            if not cliente:
+                messagebox.showerror("Error", "Debe seleccionar un cliente")
+                return
+
+            # Verificar si el carrito tiene elementos
+            if not self.cart_list.get_children():
+                messagebox.showerror("Error", "El carrito está vacío")
+                return
+
+            # Inicializar detalles del pedido
+            items = []
+            total = 0
+            cantidad_total = 0
+
+            try:
+                # Procesar los elementos del carrito
+                for item in self.cart_list.get_children():
+                    menu, cantidad, precio = self.cart_list.item(item)["values"]
+                    precio = float(precio.replace("$", "").strip())
+                    cantidad = int(cantidad)
+
+                    items.append({
+                        "menu": menu,
+                        "cantidad": cantidad,
+                        "precio": precio
+                    })
+                    total += precio * cantidad
+                    cantidad_total += cantidad
+            except ValueError:
+                messagebox.showerror("Error", "Datos inválidos en el carrito")
+                return
+
+            descripcion = f"Pedido de {len(items)} items"
+
+            try:
+                # Crear pedido en la base de datos
+                pedido_id = pedido_crud.crear_pedido(
+                    cliente=cliente,
+                    descripcion=descripcion,
+                    total=total,
+                    cantidad=cantidad_total,
+                    items=items
+                )
+
+                # Generar boleta PDF
+                self.generar_boleta_pdf(pedido_id)
+
+                # Notificar éxito
+                messagebox.showinfo("Éxito", "Pedido registrado correctamente")
+                self.limpiar_carrito()
+                self.actualizar_lista_pedidos()
+            except RuntimeError as e:
+                messagebox.showerror("Error", f"No se pudo registrar el pedido: {str(e)}")
+
+    def mostrar_detalles_pedido(self):
+        seleccion = self.pedidos_tree.selection()
+        if not seleccion:
+            messagebox.showerror("Error", "Seleccione un pedido para ver los detalles")
+            return
+
+        pedido_id = self.pedidos_tree.item(seleccion)["values"][0]
+        try:
+            detalles = pedido_crud.obtener_detalles(pedido_id)  # Implementar esta función en el CRUD
+            self.details_tree.delete(*self.details_tree.get_children())
+            for detalle in detalles:
+                self.details_tree.insert("", "end", values=(
+                    detalle["menu"], detalle["cantidad"], detalle["precio"], detalle["subtotal"]
+                ))
+        except RuntimeError as e:
+            messagebox.showerror("Error", f"No se pudieron cargar los detalles: {str(e)}")
+
+
+    def filtrar_pedidos(self):
+            cliente = self.cliente_filtro.get()
+
+            try:
+                if not cliente:
+                    # Mostrar todos los pedidos si no hay filtro
+                    self.actualizar_lista_pedidos()
+                else:
+                    # Filtrar por cliente
+                    pedidos = pedido_crud.buscar_por_cliente(cliente)
+                    self.actualizar_lista_pedidos(pedidos)
+            except RuntimeError as e:
+                messagebox.showerror("Error", f"No se pudo filtrar los pedidos: {str(e)}")
+
+    def actualizar_pedido(self):
+            seleccion = self.pedidos_tree.selection()
+
+            if not seleccion:
+                messagebox.showerror("Error", "Seleccione un pedido para actualizar")
+                return
+
+            # Obtener ID del pedido seleccionado
+            pedido_id = self.pedidos_tree.item(seleccion)["values"][0]
+
+            # Crear ventana para actualizar cantidad
+            update_window = ctk.CTkToplevel()
+            update_window.title("Actualizar Pedido")
+            update_window.geometry("300x150")
+
+            cantidad_label = ctk.CTkLabel(update_window, text="Nueva cantidad:")
+            cantidad_label.pack(pady=10)
+
+            cantidad_entry = ctk.CTkEntry(update_window)
+            cantidad_entry.pack(pady=5)
+
+            def confirmar_actualizacion():
+                try:
+                    nueva_cantidad = int(cantidad_entry.get())
+                    if nueva_cantidad <= 0:
+                        raise ValueError("La cantidad debe ser mayor a cero")
+
+                    # Actualizar cantidad en la base de datos
+                    pedido_crud.actualizar_cantidad(pedido_id, nueva_cantidad)
+                    self.actualizar_lista_pedidos()
+
+                    messagebox.showinfo("Éxito", "Pedido actualizado correctamente")
+                    update_window.destroy()
+                except ValueError as ve:
+                    messagebox.showerror("Error", str(ve))
+                except RuntimeError as e:
+                    messagebox.showerror("Error", f"No se pudo actualizar el pedido: {str(e)}")
+
+            confirmar_btn = ctk.CTkButton(
+                update_window,
+                text="Actualizar",
+                command=confirmar_actualizacion
+            )
+            confirmar_btn.pack(pady=20)
+
+
+
+
+
+
+
+
     def mostrar_panel_graficos(self):
         self.limpiar_panel()
         
@@ -1440,192 +1605,61 @@ class RestauranteApp(ctk.CTk):
         stats_label.pack()
 
     def limpiar_panel(self):
+        # Limpiar cualquier widget del panel
         for widget in self.main_frame.winfo_children():
             widget.destroy()
 
-    def registrar_pedido(self):
-        if not self.cliente_combo.get():
-            messagebox.showerror("Error", "Debe seleccionar un cliente")
-            return
-            
-        if not self.cart_list.get_children():
-            messagebox.showerror("Error", "El carrito está vacío")
-            return
-            
-        # Obtener detalles del pedido
-        cliente = self.cliente_combo.get()
-        items = []
-        total = 0
-        cantidad_total = 0
-        
-        for item in self.cart_list.get_children():
-            menu, cantidad, precio = self.cart_list.item(item)["values"]
-            precio = float(precio.replace("$", ""))
-            items.append({
-                "menu": menu,
-                "cantidad": cantidad,
-                "precio": precio
-            })
-            total += precio
-            cantidad_total += cantidad
-        
-        descripcion = f"Pedido de {len(items)} items"
-        
-        # Crear pedido en la base de datos
-        pedido_id = pedido_crud.crear_pedido(
-            cliente=cliente,
-            descripcion=descripcion,
-            total=total,
-            cantidad=cantidad_total,
-            items=items
-        )
-        
-        # Generar boleta
-        self.generar_boleta_pdf(pedido_id)
-        
-        messagebox.showinfo("Éxito", "Pedido registrado correctamente")
-        self.limpiar_carrito()
-        self.actualizar_lista_pedidos()
-
-    def filtrar_pedidos(self):
-        cliente = self.cliente_filtro.get()
-        if not cliente:
-            self.actualizar_lista_pedidos()
-            return
-            
-        pedidos = pedido_crud.buscar_por_cliente(cliente)
-        self.actualizar_lista_pedidos(pedidos)
-
-    def actualizar_pedido(self):
-        seleccion = self.pedidos_tree.selection()
-        if not seleccion:
-            messagebox.showerror("Error", "Seleccione un pedido para actualizar")
-            return
-            
-        pedido_id = self.pedidos_tree.item(seleccion)["values"][0]
-        
-        # Ventana para actualizar cantidad
-        update_window = ctk.CTkToplevel()
-        update_window.title("Actualizar Pedido")
-        update_window.geometry("300x150")
-        
-        cantidad_label = ctk.CTkLabel(update_window, text="Nueva cantidad:")
-        cantidad_label.pack(pady=10)
-        
-        cantidad_entry = ctk.CTkEntry(update_window)
-        cantidad_entry.pack(pady=5)
-        
-        def confirmar_actualizacion():
-            try:
-                nueva_cantidad = int(cantidad_entry.get())
-                if nueva_cantidad <= 0:
-                    raise ValueError()
-            except ValueError:
-                messagebox.showerror("Error", "Ingrese una cantidad válida")
-                return
-                
-            pedido_crud.actualizar_cantidad(pedido_id, nueva_cantidad)
-            self.actualizar_lista_pedidos()
-            update_window.destroy()
-        
-        confirmar_btn = ctk.CTkButton(
-            update_window,
-            text="Actualizar",
-            command=confirmar_actualizacion
-        )
-        confirmar_btn.pack(pady=20)
-
-    def eliminar_pedido(self):
-        seleccion = self.pedidos_tree.selection()
-        if not seleccion:
-            messagebox.showerror("Error", "Seleccione un pedido para eliminar")
-            return
-            
-        if messagebox.askyesno("Confirmar", "¿Está seguro de eliminar el pedido?"):
-            pedido_id = self.pedidos_tree.item(seleccion)["values"][0]
-            pedido_crud.eliminar_pedido(pedido_id)
-            self.actualizar_lista_pedidos()
-
-    def actualizar_lista_pedidos(self, pedidos=None):
-        # Limpiar tabla
-        for item in self.pedidos_tree.get_children():
-            self.pedidos_tree.delete(item)
-            
-        # Obtener pedidos si no se proporcionaron
-        if pedidos is None:
-            pedidos = pedido_crud.obtener_todos()
-            
-        # Insertar pedidos en la tabla
-        for pedido in pedidos:
-            self.pedidos_tree.insert("", "end", values=(
-                pedido.id,
-                pedido.cliente,
-                pedido.descripcion,
-                pedido.fecha_creacion,
-                f"${pedido.total:.2f}",
-                pedido.cantidad
-            ))
-
     def generar_grafico(self):
         tipo_grafico = self.graph_combo.get()
+        fecha_inicio = self.fecha_inicio_entry.get()
+        fecha_fin = self.fecha_fin_entry.get()
+        
+        # Validaciones
+        if not tipo_grafico or tipo_grafico == "Seleccione un tipo de gráfico":
+            print("Error: Debes seleccionar un tipo de gráfico.")
+            return
+        
+        try:
+            fecha_inicio = datetime.datetime.strptime(fecha_inicio, "%d/%m/%Y") if fecha_inicio else None
+            fecha_fin = datetime.datetime.strptime(fecha_fin, "%d/%m/%Y") if fecha_fin else None
+        except ValueError:
+            print("Error: Las fechas no tienen el formato correcto.")
+            return
         
         # Limpiar gráfico anterior si existe
         if hasattr(self, 'canvas_grafico'):
             self.canvas_grafico.get_tk_widget().destroy()
-        
+
         # Crear nueva figura
         fig, ax = plt.subplots(figsize=(10, 6))
-        
+
         if tipo_grafico == "Ventas Diarias":
             # Obtener datos de ventas diarias
             fechas = []
             ventas = []
             for i in range(7):  # Últimos 7 días
-                fecha = datetime.now() - timedelta(days=i)
-                total = pedido_crud.obtener_ventas_por_fecha(fecha)
+                fecha = datetime.datetime.now() - datetime.timedelta(days=i)
+                total = self.pedido_crud.obtener_ventas_por_fecha(fecha)  # Asumiendo que tienes el CRUD correctamente configurado
                 fechas.append(fecha.strftime('%d/%m'))
                 ventas.append(total)
-            
+
             ax.bar(fechas, ventas)
             ax.set_title('Ventas Diarias')
-            
-        elif tipo_grafico == "Ventas Mensuales":
-            # Datos de ejemplo para ventas mensuales
-            meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun']
-            ventas = pedido_crud.obtener_ventas_mensuales()
-            ax.plot(meses, ventas, marker='o')
-            ax.set_title('Ventas Mensuales')
-            
-        elif tipo_grafico == "Menús más Vendidos":
-            # Obtener datos de menús más vendidos
-            menus = menu_crud.obtener_mas_vendidos()
-            nombres = [menu['nombre'] for menu in menus]
-            cantidades = [menu['cantidad'] for menu in menus]
-            
-            ax.pie(cantidades, labels=nombres, autopct='%1.1f%%')
-            ax.set_title('Menús más Vendidos')
-            
-        elif tipo_grafico == "Ingredientes más Utilizados":
-            # Obtener ingredientes más utilizados
-            ingredientes = ingrediente_crud.obtener_mas_utilizados()
-            nombres = [ing['nombre'] for ing in ingredientes]
-            cantidades = [ing['cantidad'] for ing in ingredientes]
-            
-            ax.barh(nombres, cantidades)
-            ax.set_title('Ingredientes más Utilizados')
 
-        # Configurar estilo
+        # Agregar más tipos de gráficos según el tipo seleccionado...
+
+        # Configurar estilo del gráfico
         plt.style.use('dark_background')
         fig.patch.set_facecolor('#2b2b2b')
         ax.set_facecolor('#2b2b2b')
         
-        # Crear widget de canvas
+        # Crear widget de canvas para mostrar el gráfico
         self.canvas_grafico = FigureCanvasTkAgg(fig, master=self.graph_frame)
         self.canvas_grafico.draw()
         self.canvas_grafico.get_tk_widget().pack(fill='both', expand=True)
-        
-        # Actualizar estadísticas
-        self.actualizar_estadisticas()
+
+    
+
 
     def actualizar_estadisticas(self):
         # Obtener estadísticas
@@ -1637,152 +1671,6 @@ class RestauranteApp(ctk.CTk):
         self.mejor_dia_label.configure(text=stats['mejor_dia'])
         self.peor_dia_label.configure(text=stats['peor_dia'])
 
-    def generar_boleta_pdf(self, pedido_id):
-        """Genera una boleta en PDF para un pedido específico"""
-        
-        # Obtener información del pedido
-        pedido = pedido_crud.obtener_pedido(pedido_id)
-        if not pedido:
-            messagebox.showerror("Error", "Pedido no encontrado")
-            return
-
-        # Crear PDF
-        pdf = FPDF()
-        pdf.add_page()
-        
-        # Configurar fuente
-        pdf.set_font("Arial", size=12)
-        
-        # Encabezado
-        pdf.cell(200, 10, txt="RESTAURANTE GESTIÓN", ln=True, align="C")
-        pdf.set_font("Arial", size=10)
-        pdf.cell(200, 10, txt=f"Fecha: {datetime.now().strftime('%d/%m/%Y %H:%M')}", ln=True, align="R")
-        pdf.cell(200, 10, txt=f"Boleta N°: {pedido_id}", ln=True, align="R")
-        
-        # Datos del cliente
-        pdf.ln(10)
-        pdf.cell(200, 10, txt=f"Cliente: {pedido.cliente}", ln=True)
-        
-        # Tabla de items
-        pdf.ln(10)
-        # Encabezados
-        pdf.set_fill_color(200, 200, 200)
-        pdf.cell(80, 10, txt="Menú", border=1, fill=True)
-        pdf.cell(30, 10, txt="Cantidad", border=1, fill=True)
-        pdf.cell(40, 10, txt="Precio Unit.", border=1, fill=True)
-        pdf.cell(40, 10, txt="Subtotal", border=1, fill=True, ln=True)
-        
-        # Detalles de items
-        total = 0
-        for item in pedido.items:
-            pdf.cell(80, 10, txt=item.menu, border=1)
-            pdf.cell(30, 10, txt=str(item.cantidad), border=1)
-            pdf.cell(40, 10, txt=f"${item.precio:.2f}", border=1)
-            subtotal = item.cantidad * item.precio
-            pdf.cell(40, 10, txt=f"${subtotal:.2f}", border=1, ln=True)
-            total += subtotal
-        
-        # Total
-        pdf.ln(10)
-        pdf.set_font("Arial", "B", 12)
-        pdf.cell(150, 10, txt="Total:", align="R")
-        pdf.cell(40, 10, txt=f"${total:.2f}", ln=True)
-        
-        # Pie de página
-        pdf.ln(20)
-        pdf.set_font("Arial", size=8)
-        pdf.cell(200, 10, txt="Gracias por su compra", align="C")
-        
-        # Guardar PDF
-        fecha = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"boleta_{pedido_id}_{fecha}.pdf"
-        pdf.output(filename)
-        
-        messagebox.showinfo("Éxito", f"Boleta generada: {filename}")
-
 if __name__ == "__main__":
     app = RestauranteApp()
     app.mainloop()
-
-import tkinter as tk
-from tkinter import ttk
-
-class App:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Aplicación con Scrollbar")
-
-        # Crear un frame para el menú y la scrollbar
-        menu_frame = ttk.Frame(self.root)
-        menu_frame.pack(fill=tk.BOTH, expand=True)
-
-        # Crear el Treeview para los detalles
-        self.details_tree = ttk.Treeview(menu_frame)
-        self.details_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-
-        # Crear la scrollbar
-        scrollbar = ttk.Scrollbar(menu_frame, orient="vertical", command=self.details_tree.yview)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-
-        # Configurar el Treeview para usar la scrollbar
-        self.details_tree.configure(yscrollcommand=scrollbar.set)
-
-        # Datos de ejemplo
-        detalles = [
-            ("Item 1", "Descripción 1"),
-            ("Item 2", "Descripción 2"),
-            ("Item 3", "Descripción 3"),
-            # Agrega más datos aquí
-        ]
-
-        # Limpiar tabla de detalles y agregar nuevos datos
-        for item in self.details_tree.get_children():
-            self.details_tree.delete(item)
-        
-        for detalle in detalles:
-            self.details_tree.insert("", "end", values=detalle)
-
-    def mostrar_panel_graficos(self):
-        self.limpiar_panel()
-        
-        # Header
-        header_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
-        header_frame.grid(row=0, column=0, padx=20, pady=(20,10), sticky="ew")
-
-        # Botón para generar gráfico
-        generar_btn = ctk.CTkButton(
-            header_frame,
-            text="Generar Gráfico",
-            width=120
-        )
-        generar_btn.pack(side="right", padx=20)
-        
-        # Marco para el gráfico
-        graph_frame = ctk.CTkFrame(self.main_frame)
-        graph_frame.grid(row=2, column=0, padx=20, pady=(0,20), sticky="nsew")
-        self.main_frame.grid_rowconfigure(2, weight=1)
-        
-        # Placeholder para el gráfico
-        graph_placeholder = ctk.CTkLabel(
-            graph_frame,
-            text="El gráfico se mostrará aquí",
-            font=ctk.CTkFont(size=16)
-        )
-        graph_placeholder.pack(expand=True)
-        
-        # Panel de estadísticas
-        stats_frame = ctk.CTkFrame(self.main_frame)
-        stats_frame.grid(row=3, column=0, padx=20, pady=(0,20), sticky="ew")
-        
-        # Título de estadísticas
-        stats_label = ctk.CTkLabel(
-            stats_frame,
-            text="Estadísticas",
-            font=ctk.CTkFont(size=16)
-        )
-        stats_label.pack()
-
-if __name__ == "__main__":
-    root = tk.Tk()
-    app = App(root)
-    root.mainloop()
