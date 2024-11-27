@@ -927,7 +927,7 @@ class RestauranteApp(ctk.CTk):
         # CONTENIDO DEL PANEL DE COMPRA
         
         # Selección de cliente
-        cliente_frame = ctk.CTkFrame(compra_frame, fg_color="transparent")
+        cliente_frame = ctk.CTkFrame(compra_frame, fg_color = "transparent")
         cliente_frame.pack(fill="x", padx=20, pady=10)
 
         cliente_label = ctk.CTkLabel(cliente_frame, text="Seleccionar Cliente:")
@@ -971,7 +971,7 @@ class RestauranteApp(ctk.CTk):
             menus_frame,
             text="Agregar al Carrito",
             width=150,
-            command=lambda: self.agregar_al_carrito(self.menus_list, self.cantidad_entry)
+            command=lambda: self.agregar_al_carrito(self.cantidad_entry)
         )
         add_cart_btn.pack(pady=10)
 
@@ -1019,6 +1019,199 @@ class RestauranteApp(ctk.CTk):
         # Cargar menús disponibles
         self.cargar_menus_disponibles()
 
+    def agregar_al_carrito(self, cantidad_entry):
+        # Intentar convertir la entrada de cantidad a un entero
+        try:
+            cantidad = int(cantidad_entry.get())
+            if cantidad <= 0:
+                raise ValueError("La cantidad debe ser mayor que cero.")
+        except ValueError as e:
+            messagebox.showerror("Error", f"Ingrese una cantidad válida. {str(e)}")
+            return
+
+        # Obtener el elemento seleccionado en menus_list
+        seleccion = self.menus_list.focus()
+        if not seleccion:
+            messagebox.showerror("Error", "Seleccione un menú para agregar.")
+            return
+
+        # Obtener los valores del elemento seleccionado
+        valores = self.menus_list.item(seleccion, "values")
+        if not valores or len(valores) < 2:
+            messagebox.showerror("Error", "No se pudo obtener la información del menú seleccionado.")
+            return
+
+        # Verificar que el precio sea un valor válido
+        try:
+            nombre = valores[0]
+            precio = float(valores[1].replace('$', '').replace(',', ''))  # Asegúrate de que el precio esté en formato numérico
+        except (ValueError, TypeError) as e:
+            messagebox.showerror("Error", "El precio del menú seleccionado no es válido.")
+            return
+
+        # Insertar el artículo en el carrito
+        self.cart_list.insert("", "end", values=(nombre, cantidad, f"${precio * cantidad:.2f}"))
+
+        # Actualizar el total del carrito
+        self.actualizar_total() 
+    def mostrar_panel_compra(self):
+        self.limpiar_panel()
+
+        # Header
+        header_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        header_frame.grid(row=0, column=0, padx=20, pady=(20, 10), sticky="ew")
+
+        title = ctk.CTkLabel(
+            header_frame,
+            text="Panel de Compra",
+            font=ctk.CTkFont(size=24, weight="bold")
+        )
+        title.pack(side="left")
+
+        # Frame principal con scrollbar
+        main_scroll_frame = ctk.CTkFrame(self.main_frame)
+        main_scroll_frame.grid(row=1, column=0, padx=20, pady=(0, 20), sticky="nsew")
+        self.main_frame.grid_rowconfigure(1, weight=1)
+        self.main_frame.grid_columnconfigure(0, weight=1)
+
+        # Configuración del contenedor con scrollbar
+        content_frame = ctk.CTkFrame(main_scroll_frame)
+        content_frame.pack(side="left", fill="both", expand=True, padx=(0, 10))
+
+        # Scrollbar
+        scrollbar = ctk.CTkScrollbar(main_scroll_frame, orientation="vertical")
+        scrollbar.pack(side="right", fill="y")
+
+        # Canvas con tema oscuro
+        canvas = tk.Canvas(
+            content_frame,
+            yscrollcommand=scrollbar.set,
+            bg='#2b2b2b',
+            highlightthickness=0,
+            width=950
+        )
+        canvas.pack(side="left", fill="both", expand=True)
+
+        # Configurar scrollbar
+        scrollbar.configure(command=canvas.yview)
+
+        # Frame para contenido
+        compra_frame = ctk.CTkFrame(canvas)
+        canvas_window = canvas.create_window(
+            (0, 0),
+            window=compra_frame,
+            anchor="nw",
+            width=canvas.winfo_reqwidth()
+        )
+
+        # Eventos de configuración
+        def on_configure(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+            canvas.itemconfig(
+                canvas_window,
+                width=max(event.width, 950)
+            )
+
+        compra_frame.bind("<Configure>", on_configure)
+
+        def on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        canvas.bind_all("<MouseWheel>", on_mousewheel)
+
+        # CONTENIDO DEL PANEL DE COMPRA
+        
+        # Selección de cliente
+        cliente_frame = ctk.CTkFrame(compra_frame, fg_color="transparent")
+        cliente_frame.pack(fill="x", padx=20, pady=10)
+
+        cliente_label = ctk.CTkLabel(cliente_frame, text="Seleccionar Cliente:")
+        cliente_label.pack(side="left", padx=5)
+
+        self.cliente_combo = ttk.Combobox(cliente_frame, width=40)
+        self.cliente_combo.pack(side="left", padx=5)
+
+        # Cargar clientes
+        self.cargar_clientes()
+
+        # Panel de menús
+        menus_frame = ctk.CTkFrame(compra_frame)
+        menus_frame.pack(fill="x", padx=20, pady=10)
+
+        menus_label = ctk.CTkLabel(
+            menus_frame,
+            text="Menús Disponibles",
+            font=ctk.CTkFont(size=16, weight="bold")
+        )
+        menus_label.pack(pady=10)
+
+        # Lista de menús
+        self.menus_list = ttk.Treeview(menus_frame, columns=("nombre", "precio"), show="headings", height=6)
+        self.menus_list.heading("nombre", text="Nombre")
+        self.menus_list.heading("precio", text="Precio")
+        self.menus_list.pack(fill="x", padx=20, pady=5)
+
+        # Cantidad
+        cantidad_frame = ctk.CTkFrame(menus_frame, fg_color="transparent")
+        cantidad_frame.pack(fill="x", padx=20, pady=5)
+
+        cantidad_label = ctk.CTkLabel(cantidad_frame, text="Cantidad:")
+        cantidad_label.pack(side="left", padx=5)
+
+        self.cantidad_entry = ctk.CTkEntry(cantidad_frame, width=100)
+        self.cantidad_entry.pack(side="left", padx=5)
+
+        # Botón agregar
+        add_cart_btn = ctk.CTkButton(
+            menus_frame,
+            text="Agregar al Carrito",
+            width=150,
+            command=lambda: self.agregar_al_carrito(self.cantidad_entry)
+        )
+        add_cart_btn.pack(pady=10)
+
+        # Carrito
+        cart_frame = ctk.CTkFrame(compra_frame)
+        cart_frame.pack(fill="x", padx=20, pady=10)
+
+        cart_label= ctk.CTkLabel(
+            cart_frame,
+            text="Carrito de Compras",
+            font=ctk.CTkFont(size=16, weight="bold")
+        )
+        cart_label.pack(pady=10)
+
+        self.cart_list = ttk.Treeview(cart_frame, columns=("nombre", "cantidad", "precio"), show="headings", height=6)
+        self.cart_list.heading("nombre", text="Nombre")
+        self.cart_list.heading("cantidad", text="Cantidad")
+        self.cart_list.heading("precio", text="Precio")
+        self.cart_list.pack(fill="x", padx=20, pady=5)
+
+        # Total y botones
+        total_frame = ctk.CTkFrame(compra_frame, fg_color="transparent")
+        total_frame.pack(fill="x", padx=20, pady=10)
+
+        self.total_label = ctk.CTkLabel(
+            total_frame,
+            text="Total: $0.00",
+            font=ctk.CTkFont(size=16, weight="bold")
+        )
+        self.total_label.pack(side="right", padx=10)
+
+        # Botones finales
+        button_frame = ctk.CTkFrame(compra_frame, fg_color="transparent")
+        button_frame.pack(fill="x", padx=20, pady=10)
+
+        generar_btn = ctk.CTkButton(
+            button_frame,
+            text="Generar Pedido",
+            width=150,
+            height=40,
+            command=self.generar_pedido
+        )
+        generar_btn.pack(side="right", padx=10)
+
+        # Cargar menús disponibles
+        self.cargar_menus_disponibles()
     def cargar_clientes(self):
         # Obtener clientes desde la base de datos
         clientes = cliente_crud.leer_clientes()
@@ -1039,7 +1232,7 @@ class RestauranteApp(ctk.CTk):
         except Exception as e:
             messagebox.showerror("Error", f"No se pudieron cargar los menús: {str(e)}")
 
-    def agregar_al_carrito(self, menus_list, cantidad_entry):
+    def agregar_al_carrito(self, cantidad_entry):
         # Intentar convertir la entrada de cantidad a un entero
         try:
             cantidad = int(cantidad_entry.get())
@@ -1050,27 +1243,28 @@ class RestauranteApp(ctk.CTk):
             return
 
         # Obtener el elemento seleccionado en menus_list
-        seleccion = menus_list.focus()
+        seleccion = self.menus_list.focus()
         if not seleccion:
             messagebox.showerror("Error", "Seleccione un menú para agregar.")
             return
 
         # Obtener los valores del elemento seleccionado
-        valores = menus_list.item(seleccion, "values")
+        valores = self.menus_list.item(seleccion, "values")
         if not valores or len(valores) < 2:
             messagebox.showerror("Error", "No se pudo obtener la información del menú seleccionado.")
             return
 
         # Verificar que el precio sea un valor válido
         try:
-            nombre, precio = valores[0], float(valores[1])
+            nombre = valores[0]
+            precio = float(valores[1].replace('$', '').replace(',', ''))  # Asegúrate de que el precio esté en formato numérico
         except (ValueError, TypeError) as e:
             messagebox.showerror("Error", "El precio del menú seleccionado no es válido.")
             return
 
         # Insertar el artículo en el carrito
         self.cart_list.insert("", "end", values=(nombre, cantidad, f"${precio * cantidad:.2f}"))
-        
+
         # Actualizar el total del carrito
         self.actualizar_total()
 
@@ -1079,6 +1273,13 @@ class RestauranteApp(ctk.CTk):
         for item in self.cart_list.get_children():
             total += float(self.cart_list.item(item, "values")[2][1:])  # Extraer el valor sin el símbolo '$'
         self.total_label.configure(text=f"Total: ${total:.2f}")
+
+    def limpiar_carrito(self):
+        """
+        Limpia todos los elementos del carrito y restablece el total.
+        """
+        self.cart_list.delete(*self.cart_list.get_children())  # Eliminar todos los elementos del carrito
+        self.total_label.configure(text="Total: $0.00")        # Restablecer el total a $0.00
 
     def generar_pedido(self):
         cliente_seleccionado = self.cliente_combo.get()
@@ -1104,71 +1305,32 @@ class RestauranteApp(ctk.CTk):
 
                 # Disminuir la cantidad de cada ingrediente
                 for ingrediente in ingredientes:
-                    ingrediente_crud.disminuir_ingrediente(
-                        ingrediente["nombre"], 
-                        ingrediente["cantidad"] * int(cantidad)
-                    )
+                    cantidad_a_disminuir = ingrediente["cantidad"] * int(cantidad)
+                    
+                    # Verificar si hay suficiente cantidad en stock
+                    if ingrediente_crud.verificar_cantidad_disponible(ingrediente["nombre"], cantidad_a_disminuir):
+                        ingrediente_crud.disminuir_ingrediente(ingrediente["nombre"], cantidad_a_disminuir)
+                    else:
+                        messagebox.showwarning(
+                            "Advertencia",
+                            f"No hay suficiente '{ingrediente['nombre']}' en stock para el menú '{nombre_menu}'."
+                        )
+                        continue
+
+            # Registrar el pedido en la base de datos
+            self.registrar_pedido()
+
+            # Generar PDF después de procesar el pedido
+
+            self.generar_pedido_pdf()  # Llama a la función para generar el PDF
 
             messagebox.showinfo("Pedido Generado", "El pedido ha sido generado exitosamente.")
             self.limpiar_carrito()
-            self.registrar_pedido()
 
         except Exception as e:
             messagebox.showerror("Error", f"Ocurrió un error al generar el pedido: {str(e)}")
 
-
-
-    def agregar_al_carrito(self, menus_list, cantidad_entry):
-        # Intentar convertir la entrada de cantidad a un entero
-        try:
-            cantidad = int(cantidad_entry.get())
-            if cantidad <= 0:
-                raise ValueError("La cantidad debe ser mayor que cero.")
-        except ValueError as e:
-            messagebox.showerror("Error", f"Ingrese una cantidad válida. {str(e)}")
-            return
-
-        # Obtener el elemento seleccionado en menus_list
-        seleccion = menus_list.focus()
-        if not seleccion:
-            messagebox.showerror("Error", "Seleccione un menú para agregar.")
-            return
-
-        # Obtener los valores del elemento seleccionado
-        valores = menus_list.item(seleccion, "values")
-        if not valores or len(valores) < 2:
-            messagebox.showerror("Error", "No se pudo obtener la información del menú seleccionado.")
-            return
-
-        nombre, precio = valores[0], float(valores[1])
-
-        # Insertar el artículo en el carrito
-        self.cart_list.insert("", "end", values=(nombre, cantidad, f"${precio * cantidad:.2f}"))
-        
-        # Actualizar el total del carrito
-        self.actualizar_total()
-
-    def actualizar_total(self):
-        total = 0
-        for item in self.cart_list.get_children():
-            total += float(self.cart_list.item(item, "values")[2][1:])  # Extraer el valor sin el símbolo '$'
-        self.total_label.configure(text=f"Total: ${total:.2f}")
-
-    def limpiar_carrito(self):
-        """
-        Limpia todos los elementos del carrito y restablece el total.
-        """
-        self.cart_list.delete(*self.cart_list.get_children())  # Eliminar todos los elementos del carrito
-        self.total_label.configure(text="Total: $0.00")        # Restablecer el total a $0.00
-
     def generar_pedido_pdf(self):
-        """
-        Genera un archivo PDF con la boleta del pedido actual.
-        """
-        if not self.cart_list.get_children():
-            messagebox.showwarning("Carrito Vacío", "No hay elementos en el carrito para generar la boleta.")
-            return
-
         try:
             # Crear el PDF
             pdf = FPDF()
@@ -1180,53 +1342,50 @@ class RestauranteApp(ctk.CTk):
             pdf.cell(200, 10, txt="Boleta de Compra", ln=True, align="C")
             pdf.ln(10)
 
-            # Tabla de encabezados
-            pdf.set_font("Arial", size=12)
-            pdf.set_fill_color(200, 200, 200)  # Fondo para encabezados
-            pdf.cell(80, 10, txt="Nombre", border=1, fill=True, align="C")
-            pdf.cell(40, 10, txt="Cantidad", border=1, fill=True, align="C")
-            pdf.cell(40, 10, txt="Precio", border=1, fill=True, align="C")
-            pdf.ln()
-
-            # Agregar los datos del carrito al PDF
-            total = 0
-            for item in self.cart_list.get_children():
-                nombre, cantidad, precio = self.cart_list.item(item, "values")
-                total += float(precio[1:])  # Sumar el precio sin el símbolo $
-                pdf.cell(80, 10, txt=nombre, border=1)
-                pdf.cell(40, 10, txt=str(cantidad), border=1, align="C")
-                pdf.cell(40, 10, txt=precio, border=1, align="R")
+            # Si el carrito está vacío, agregar un mensaje
+            if not self.cart_list.get_children():
+                pdf.cell(0, 10, txt="No hay productos en el carrito.", ln=True, align="C")
+            else:
+                # Tabla de encabezados
+                pdf.set_font("Arial", size=12)
+                pdf.set_fill_color(200, 200, 200)  # Fondo para encabezados
+                pdf.cell(80, 10, txt="Nombre", border=1, fill=True, align="C")
+                pdf.cell(40, 10, txt="Cantidad", border=1, fill=True, align="C")
+                pdf.cell(40, 10, txt="Precio", border=1, fill=True, align="C")
                 pdf.ln()
 
-            # Total
-            pdf.ln(10)
-            pdf.set_font("Arial", style="B", size=12)
-            pdf.cell(0, 10, txt=f"Total: {self.total_label.cget('text')}", align="R")
+                total = 0
+                for item in self.cart_list.get_children():
+                    nombre, cantidad, precio = self.cart_list.item(item, "values")
+                    precio_valor = float(precio[1:])  # Extraer valor sin $
+                    total += precio_valor
+
+                    pdf.cell(80, 10, txt=nombre, border=1)
+                    pdf.cell(40, 10, txt=str(cantidad), border=1, align="C")
+                    pdf.cell(40, 10, txt=f"${precio_valor:.2f}", border=1, align="R")
+                    pdf.ln()
+
+                # Mostrar el total
+                pdf.ln(10)
+                pdf.set_font("Arial", style="B", size=12)
+                pdf.cell(0, 10, txt=f"Total: ${total:.2f}", align="R")
 
             # Guardar el archivo
             pdf_file = "boleta_pedido.pdf"
             pdf.output(pdf_file)
 
-            # Verificar y abrir el archivo
+            # Verificar si el archivo se guardó correctamente
             if os.path.exists(pdf_file):
                 messagebox.showinfo("Pedido Generado", f"Pedido guardado como {pdf_file}")
-                os.system(f"start {pdf_file}")
+                os.startfile(pdf_file)  # Cambiar según el sistema operativo
             else:
                 messagebox.showerror("Error", "No se pudo guardar el PDF.")
         except Exception as e:
             messagebox.showerror("Error", f"Ocurrió un problema al generar la boleta: {str(e)}")
-
-            # Limpiar el carrito tras generar el PDF
+        
+        # Limpiar el carrito tras generar el PDF
         self.limpiar_carrito()
-
         
-        
-        
-    
-    
-    
-    
-    
     def mostrar_panel_pedidos(self):
         self.limpiar_panel()
         
